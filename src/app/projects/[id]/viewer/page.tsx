@@ -5,6 +5,29 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
 import { IssueMarkers, IssueMarker } from '@/app/components/viewer/issue-markers';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Plus, ListIcon } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -49,10 +72,10 @@ const STATUS_LABELS: Record<string, string> = {
   DONE: '完了',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: 'bg-red-100 text-red-800',
-  IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
-  DONE: 'bg-green-100 text-green-800',
+const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  OPEN: 'destructive',
+  IN_PROGRESS: 'default',
+  DONE: 'secondary',
 };
 
 const ISSUE_TYPES = ['quality', 'safety', 'construction', 'design'];
@@ -158,8 +181,13 @@ export default function ViewerPage({ params }: PageProps) {
 
   // フロア切替
   const handleFloorChange = (fid: string) => {
-    setSelectedFloorId(fid);
-    router.replace(`/projects/${id}/viewer?floorId=${fid}`);
+    const nextFloorId = fid || undefined;
+    setSelectedFloorId(nextFloorId);
+    if (nextFloorId) {
+      router.replace(`/projects/${id}/viewer?floorId=${nextFloorId}`);
+      return;
+    }
+    router.replace(`/projects/${id}/viewer`);
   };
 
   // 指摘一覧リフレッシュ
@@ -188,6 +216,10 @@ export default function ViewerPage({ params }: PageProps) {
       alert('タイトルと説明を入力してください');
       return;
     }
+    if (!formFiles || formFiles.length === 0) {
+      alert('指摘写真（是正前）を1枚以上選択してください');
+      return;
+    }
     if (!selectedFloorId) {
       alert('フロアを選択してください');
       return;
@@ -195,39 +227,28 @@ export default function ViewerPage({ params }: PageProps) {
 
     try {
       setSubmitting(true);
+      const fd = new FormData();
+      fd.append('floorId', selectedFloorId);
+      fd.append('title', formTitle);
+      fd.append('description', formDescription);
+      fd.append('issueType', formIssueType);
+      fd.append('locationType', 'dbId');
+      if (selectedDbId !== null) {
+        fd.append('dbId', String(selectedDbId));
+      }
+      fd.append('reportedBy', formReportedBy || 'unknown');
+      for (const file of Array.from(formFiles)) {
+        fd.append('files', file);
+      }
 
       const res = await fetch(`/api/projects/${id}/issues`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          floorId: selectedFloorId,
-          title: formTitle,
-          description: formDescription,
-          issueType: formIssueType,
-          locationType: 'dbId',
-          dbId: selectedDbId !== null ? String(selectedDbId) : undefined,
-          reportedBy: formReportedBy || 'unknown',
-        }),
+        body: fd,
       });
 
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error ?? `Failed (${res.status})`);
-      }
-
-      const { issueId } = await res.json();
-
-      // 写真アップロード（Beforeフェーズ）
-      if (formFiles && formFiles.length > 0) {
-        for (const file of Array.from(formFiles)) {
-          const fd = new FormData();
-          fd.append('file', file);
-          fd.append('photoPhase', 'BEFORE');
-          await fetch(`/api/projects/${id}/issues/${issueId}/photos`, {
-            method: 'POST',
-            body: fd,
-          });
-        }
       }
 
       // フォームリセット
@@ -243,6 +264,7 @@ export default function ViewerPage({ params }: PageProps) {
       await refreshIssues();
     } catch (err) {
       alert('エラー: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
       setSubmitting(false);
     }
   };
@@ -256,10 +278,10 @@ export default function ViewerPage({ params }: PageProps) {
     worldPosition:
       issue.locationType === 'worldPosition'
         ? {
-            x: issue.worldPositionX ?? 0,
-            y: issue.worldPositionY ?? 0,
-            z: issue.worldPositionZ ?? 0,
-          }
+          x: issue.worldPositionX ?? 0,
+          y: issue.worldPositionY ?? 0,
+          z: issue.worldPositionZ ?? 0,
+        }
         : undefined,
     highlighted: hoveredIssueId === issue.issueId,
   }));
@@ -270,53 +292,105 @@ export default function ViewerPage({ params }: PageProps) {
     process.env.NEXT_PUBLIC_APS_MODEL_URN ??
     'YOUR_MODEL_URN_HERE';
 
+  // 指摘一覧コンテンツ（PCとモバイルで共有）
+  const issueListContent = (
+    <ScrollArea className="flex-1">
+      {dataLoading ? (
+        <div className="flex flex-col items-center justify-center h-40 gap-3">
+          <div className="w-5 h-5 rounded-full border-2 border-muted-foreground border-t-primary animate-spin" />
+          <p className="text-muted-foreground text-sm">読み込み中...</p>
+        </div>
+      ) : issues.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+          <p className="text-muted-foreground text-sm bg-muted/50 px-6 py-4 rounded-xl border">指摘が見つかりません</p>
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {issues.map((issue) => (
+            <button
+              key={issue.issueId}
+              className={`w-full text-left p-4 border-b hover:bg-muted/50 transition-colors group min-h-[64px] ${hoveredIssueId === issue.issueId ? 'bg-muted border-l-4 border-l-primary pl-3' : 'border-l-4 border-l-transparent'
+                }`}
+              onMouseEnter={() => setHoveredIssueId(issue.issueId)}
+              onMouseLeave={() => setHoveredIssueId(null)}
+              onClick={() =>
+                router.push(`/projects/${id}/issues/${issue.issueId}`)
+              }
+            >
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className={`text-sm font-medium transition-colors line-clamp-2 pr-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
+                <Badge variant={STATUS_COLORS[issue.status] ?? 'outline'} className="shrink-0 text-[10px] whitespace-nowrap">
+                  {STATUS_LABELS[issue.status]}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground font-mono">
+                {issue.issueType && (
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}</Badge>
+                )}
+                <span>{new Date(issue.createdAt).toLocaleDateString('ja-JP')}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </ScrollArea>
+  );
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background pb-[60px] sm:pb-0">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/projects" className="hover:text-blue-600">
+      <header className="bg-card border-b px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 shadow-sm z-10 w-full overflow-x-auto min-h-[56px]">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0 whitespace-nowrap">
+          <Link href="/projects" className="hover:text-primary transition-colors">
             プロジェクト一覧
           </Link>
-          <span>/</span>
-          <Link href={`/projects/${id}/floors`} className="hover:text-blue-600">
+          <span className="opacity-50">/</span>
+          <Link href={`/projects/${id}/floors`} className="hover:text-primary transition-colors">
             {project?.name ?? id}
           </Link>
-          <span>/</span>
-          <span className="text-gray-900">3Dビュー</span>
+          <span className="opacity-50">/</span>
+          <span className="text-foreground/80">3Dビュー</span>
         </div>
 
         {/* フロア選択 */}
         {floors.length > 0 && (
-          <select
-            value={selectedFloorId ?? ''}
-            onChange={(e) => handleFloorChange(e.target.value)}
-            className="ml-auto text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-          >
-            <option value="">フロアを選択</option>
-            {floors.map((f) => (
-              <option key={f.floorId} value={f.floorId}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+          <div className="sm:ml-auto w-full sm:w-56 shrink-0">
+            <Select
+              value={selectedFloorId ?? '__ALL_FLOORS__'}
+              onValueChange={(value) =>
+                handleFloorChange(value === '__ALL_FLOORS__' ? '' : value)
+              }
+            >
+              <SelectTrigger className="w-full h-10">
+                <SelectValue placeholder="フロアを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__ALL_FLOORS__">フロアを選択</SelectItem>
+                {floors.map((f) => (
+                  <SelectItem key={f.floorId} value={f.floorId}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
-        <button
+        <Button
           onClick={() => setShowForm(true)}
-          className="ml-2 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors"
+          className="ml-2 shrink-0 font-medium hidden sm:flex"
         >
           + 新規指摘
-        </button>
+        </Button>
       </header>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 3D Viewer (70%) */}
-        <div className="relative flex-1" style={{ minWidth: 0 }}>
+      <div className="flex flex-col sm:flex-row flex-1 overflow-hidden relative">
+        {/* 3D Viewer (Responsive: Full width mobile, flex-1 desktop) */}
+        <div className="relative h-[50vh] sm:h-auto sm:flex-1 bg-background order-1 sm:order-none" style={{ minWidth: 0 }}>
           {error ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-red-600">{error}</p>
+              <p className="text-destructive">{error}</p>
             </div>
           ) : (
             <ApsViewer
@@ -340,181 +414,176 @@ export default function ViewerPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Issue list panel (30%) */}
-        <aside className="w-80 shrink-0 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-gray-900">
+        {/* Issue list panel (PC: Side panel, Mobile: Hidden) */}
+        <aside className="hidden sm:flex w-80 xl:w-96 shrink-0 bg-background border-l flex-col overflow-hidden shadow-none z-10">
+          <div className="px-4 py-3 border-b flex items-center justify-between bg-card shrink-0">
+            <h2 className="font-semibold text-sm text-foreground flex items-center">
               指摘一覧
               {currentFloor && (
-                <span className="ml-2 text-xs font-normal text-gray-500">
+                <Badge variant="outline" className="ml-2 font-normal">
                   {currentFloor.name}
-                </span>
+                </Badge>
               )}
             </h2>
-            <span className="text-xs text-gray-500">{issues.length} 件</span>
+            <Badge variant="secondary">{issues.length} 件</Badge>
           </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {dataLoading ? (
-              <p className="text-center text-gray-400 py-8 text-sm">読み込み中...</p>
-            ) : issues.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">指摘なし</p>
-            ) : (
-              issues.map((issue) => (
-                <button
-                  key={issue.issueId}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                    hoveredIssueId === issue.issueId ? 'bg-blue-50' : ''
-                  }`}
-                  onMouseEnter={() => setHoveredIssueId(issue.issueId)}
-                  onMouseLeave={() => setHoveredIssueId(null)}
-                  onClick={() =>
-                    router.push(`/projects/${id}/issues/${issue.issueId}`)
-                  }
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">{issue.title}</p>
-                    <span
-                      className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                        STATUS_COLORS[issue.status]
-                      }`}
-                    >
-                      {STATUS_LABELS[issue.status]}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                    {issue.issueType && (
-                      <span>{ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}</span>
-                    )}
-                    <span>{new Date(issue.createdAt).toLocaleDateString('ja-JP')}</span>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+          {issueListContent}
         </aside>
       </div>
 
-      {/* Issue registration modal */}
-      {showForm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => !submitting && setShowForm(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">新しい指摘を追加</h2>
-            </div>
+      {/* Mobile Drawer (Bottom Sheet) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex justify-between items-center p-2 z-40 pb-safe">
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button variant="outline" className="w-full h-12 flex justify-center items-center gap-2 rounded-xl border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary">
+              <ListIcon className="w-5 h-5" />
+              <span className="font-medium">指摘一覧を開く ({issues.length})</span>
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent className="h-[85vh] bg-background">
+            <DrawerHeader className="border-b pb-4 shrink-0">
+              <DrawerTitle className="flex justify-between items-center text-base">
+                <span>指摘一覧</span>
+                <Badge variant="secondary">{issues.length} 件</Badge>
+              </DrawerTitle>
+              {currentFloor && (
+                <DrawerDescription className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="font-normal">{currentFloor.name}</Badge>
+                </DrawerDescription>
+              )}
+            </DrawerHeader>
+            {issueListContent}
+          </DrawerContent>
+        </Drawer>
+      </div>
 
-            <div className="px-6 py-4 space-y-4">
+      {/* Mobile FAB */}
+      <Button
+        className="sm:hidden fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg z-40 flex items-center justify-center p-0"
+        onClick={() => setShowForm(true)}
+      >
+        <Plus className="w-7 h-7" />
+      </Button>
+
+      {/* Issue registration modal */}
+      <Dialog open={showForm} onOpenChange={(open) => !submitting && setShowForm(open)}>
+        <DialogContent className="sm:max-w-lg overflow-hidden flex flex-col max-h-[90vh] p-0 gap-0 border-border">
+          <DialogHeader className="p-6 pb-4 border-b bg-muted/20 shrink-0">
+            <DialogTitle>新しい指摘を追加</DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-5 px-1">
               {selectedDbId !== null && (
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">部材 ID (dbId)</label>
-                  <input
+                <div className="bg-muted/50 p-3 rounded-md border">
+                  <label className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">部材 ID (dbId)</label>
+                  <Input
                     type="text"
                     value={selectedDbId}
                     readOnly
-                    className="w-full border border-gray-200 rounded px-3 py-2 bg-gray-50 text-sm text-gray-700"
+                    className="w-full bg-transparent border-0 text-foreground font-mono text-sm focus-visible:ring-0 p-0 h-auto"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  タイトル <span className="text-red-500">*</span>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  タイトル <span className="text-destructive">*</span>
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   disabled={submitting}
                   placeholder="指摘のタイトルを入力"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  説明 <span className="text-red-500">*</span>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  説明 <span className="text-destructive">*</span>
                 </label>
-                <textarea
+                <Textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   disabled={submitting}
                   placeholder="指摘の詳細を入力"
                   rows={4}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60 resize-none"
+                  className="resize-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">種別</label>
-                  <select
+                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">種別</label>
+                  <Select
                     value={formIssueType}
-                    onChange={(e) => setFormIssueType(e.target.value)}
+                    onValueChange={setFormIssueType}
                     disabled={submitting}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
                   >
-                    {ISSUE_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {ISSUE_TYPE_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ISSUE_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {ISSUE_TYPE_LABELS[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">報告者</label>
-                  <input
+                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">報告者</label>
+                  <Input
                     type="text"
                     value={formReportedBy}
                     onChange={(e) => setFormReportedBy(e.target.value)}
                     disabled={submitting}
-                    placeholder="氏名"
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
+                    placeholder="氏名を入力"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  写真（是正前）
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  写真（是正前） <span className="text-destructive">*</span>
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  ref={fileInputRef}
-                  onChange={(e) => setFormFiles(e.target.files)}
-                  disabled={submitting}
-                  className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 file:cursor-pointer disabled:opacity-60"
-                />
+                <div className="border rounded-md p-2 focus-within:ring-1 focus-within:ring-ring bg-background">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    required
+                    ref={fileInputRef}
+                    onChange={(e) => setFormFiles(e.target.files)}
+                    disabled={submitting}
+                    className="border-0 p-0 h-auto file:bg-secondary file:text-secondary-foreground file:border-0 file:rounded-md file:mr-4 file:px-3 file:py-1 cursor-pointer w-full text-foreground"
+                  />
+                </div>
               </div>
             </div>
+          </ScrollArea>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowForm(false)}
-                disabled={submitting}
-                className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleSubmitIssue}
-                disabled={submitting}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 transition-colors"
-              >
-                {submitting ? '作成中...' : '作成する'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/20 shrink-0 gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowForm(false)}
+              disabled={submitting}
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleSubmitIssue}
+              disabled={submitting || !formFiles || formFiles.length === 0}
+            >
+              {submitting ? '作成中...' : '作成する'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

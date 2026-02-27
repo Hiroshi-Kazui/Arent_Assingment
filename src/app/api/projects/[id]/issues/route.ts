@@ -46,10 +46,35 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.includes('multipart/form-data')) {
+      return NextResponse.json(
+        {
+          error:
+            'Issue registration requires multipart/form-data with at least one BEFORE photo',
+        },
+        { status: 400 }
+      );
+    }
+
+    const formData = await request.formData();
+
+    const floorId = String(formData.get('floorId') || '');
+    const title = String(formData.get('title') || '');
+    const description = String(formData.get('description') || '');
+    const issueType = String(formData.get('issueType') || '') || undefined;
+    const locationType = String(formData.get('locationType') || '');
+    const dbId = String(formData.get('dbId') || '') || undefined;
+    const worldPositionX = formData.get('worldPositionX');
+    const worldPositionY = formData.get('worldPositionY');
+    const worldPositionZ = formData.get('worldPositionZ');
+    const reportedBy = String(formData.get('reportedBy') || '') || undefined;
+    const files = formData
+      .getAll('files')
+      .filter((v): v is File => v instanceof File);
 
     // リクエストバリデーション
-    if (!body.floorId || !body.title || !body.description) {
+    if (!floorId || !title || !description) {
       return NextResponse.json(
         {
           error: 'Missing required fields: floorId, title, description',
@@ -58,7 +83,7 @@ export async function POST(
       );
     }
 
-    if (!body.locationType) {
+    if (!locationType) {
       return NextResponse.json(
         {
           error: 'Missing required field: locationType',
@@ -66,12 +91,27 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (!['dbId', 'worldPosition'].includes(locationType)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid locationType. Must be dbId or worldPosition',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (files.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'At least one BEFORE photo is required when creating an issue',
+        },
+        { status: 400 }
+      );
+    }
 
     if (
-      body.locationType === 'worldPosition' &&
-      (body.worldPositionX === undefined ||
-        body.worldPositionY === undefined ||
-        body.worldPositionZ === undefined)
+      locationType === 'worldPosition' &&
+      (worldPositionX === null || worldPositionY === null || worldPositionZ === null)
     ) {
       return NextResponse.json(
         {
@@ -84,20 +124,32 @@ export async function POST(
 
     const input: CreateIssueInput = {
       projectId: id,
-      floorId: body.floorId,
-      title: body.title,
-      description: body.description,
-      issueType: body.issueType,
-      locationType: body.locationType,
-      dbId: body.dbId,
-      worldPositionX: body.worldPositionX,
-      worldPositionY: body.worldPositionY,
-      worldPositionZ: body.worldPositionZ,
-      reportedBy: body.reportedBy,
+      floorId,
+      title,
+      description,
+      issueType,
+      locationType: locationType as 'dbId' | 'worldPosition',
+      dbId,
+      worldPositionX: worldPositionX !== null ? Number(worldPositionX) : undefined,
+      worldPositionY: worldPositionY !== null ? Number(worldPositionY) : undefined,
+      worldPositionZ: worldPositionZ !== null ? Number(worldPositionZ) : undefined,
+      reportedBy,
     };
 
     const handlers = getCommandHandlers();
     const issueId = await handlers.createIssue.execute(input);
+
+    for (const file of files) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await handlers.addPhoto.execute({
+        issueId,
+        projectId: id,
+        file: buffer,
+        fileName: file.name,
+        contentType: file.type,
+        photoPhase: 'BEFORE',
+      });
+    }
 
     return successResponse(
       { issueId },

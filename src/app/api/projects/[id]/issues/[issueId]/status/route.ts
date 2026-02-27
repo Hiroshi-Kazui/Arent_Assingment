@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCommandHandlers } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import prisma from '@/infrastructure/prisma/prisma-client';
 
 interface Params {
   id: string;
@@ -46,6 +47,36 @@ export async function PATCH(
         },
         { status: 400 }
       );
+    }
+
+    // 業務ルール: 指摘写真（BEFORE）は必須
+    const beforeCount = await prisma.photo.count({
+      where: { issue_id: issueId, photo_phase: 'BEFORE' },
+    });
+    if (beforeCount === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'At least one BEFORE photo is required before changing issue status',
+        },
+        { status: 400 }
+      );
+    }
+
+    // 業務ルール: 完了報告（DONE）時は完了写真（AFTER）が必須
+    if (normalizedStatus === 'DONE') {
+      const afterCount = await prisma.photo.count({
+        where: { issue_id: issueId, photo_phase: 'AFTER' },
+      });
+      if (afterCount === 0) {
+        return NextResponse.json(
+          {
+            error:
+              'At least one AFTER photo is required to mark an issue as DONE',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const handlers = getCommandHandlers();
