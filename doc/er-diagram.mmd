@@ -1,0 +1,63 @@
+erDiagram
+    Building ||--o{ Floor : "has"
+    Building ||--o{ Project : "target"
+    Project ||--o{ Issue : "contains"
+    Floor ||--o{ Issue : "located on"
+    Issue ||--o{ Photo : "attached"
+
+    Building {
+        uuid building_id PK
+        string name
+        string address
+        decimal latitude
+        decimal longitude
+        string model_urn "APS BIM URN"
+        datetime created_at
+        datetime updated_at
+    }
+
+    Floor {
+        uuid floor_id PK
+        uuid building_id FK
+        string name "e.g. 1F, B1F, RF"
+        int floor_number "sort order"
+        datetime created_at
+        datetime updated_at
+    }
+
+    Project {
+        uuid project_id PK
+        uuid building_id FK
+        string name
+        date start_date
+        date due_date
+        string status "Planning / Active / Completed"
+        datetime created_at
+        datetime updated_at
+    }
+
+    Issue {
+        uuid issue_id PK
+        uuid project_id FK
+        uuid floor_id FK
+        string title
+        text description
+        string issue_type "Quality / Safety / Construction / Design"
+        string status "Open / InProgress / Done"
+        string location_type "DbId / WorldPosition"
+        int db_id "nullable - Viewer element ID"
+        decimal world_position_x "nullable"
+        decimal world_position_y "nullable"
+        decimal world_position_z "nullable"
+        string reported_by
+        datetime created_at
+        datetime updated_at
+    }
+
+    Photo {
+        uuid photo_id PK
+        uuid issue_id FK
+        string blob_key "storage path"
+        string photo_phase "Before / After"
+        datetime uploaded_at
+    }

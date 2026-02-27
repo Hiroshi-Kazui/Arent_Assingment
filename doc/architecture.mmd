@@ -1,0 +1,80 @@
+graph TB
+    subgraph Presentation["Presentation（UI）"]
+        Pages["Next.js Pages<br/>プロジェクト一覧 / フロア一覧<br/>3Dビュー / 指摘詳細"]
+        Components["UI Components<br/>指摘一覧パネル / 登録フォーム<br/>写真アップロード"]
+        ViewerUI["APS Viewer SDK<br/>3Dモデル表示 / マーカー描画<br/>ピン登録操作"]
+        APIRoutes["API Route Handlers<br/>REST エンドポイント"]
+    end
+
+    subgraph Application["Application（UseCase）"]
+        subgraph Commands["Commands（書き込み）"]
+            CreateIssue["CreateIssue"]
+            UpdateStatus["UpdateIssueStatus"]
+            AddPhoto["AddPhoto"]
+        end
+        subgraph Queries["Queries（読み取り）"]
+            ListBuildings["ListBuildings"]
+            ListIssues["ListIssues"]
+            GetIssueDetail["GetIssueDetail"]
+            ListProjects["ListProjects"]
+            ListFloors["ListFloors"]
+        end
+        DTO["DTOs"]
+    end
+
+    subgraph Domain["Domain（ビジネスルール）"]
+        IssueAggregate["Issue 集約ルート<br/>状態遷移ルール<br/>バリデーション"]
+        ProjectAggregate["Project 集約"]
+        ValueObjects["Value Objects<br/>Location / Coordinate"]
+        RepoInterface["Repository Interfaces<br/>IIssueRepository<br/>IProjectRepository"]
+        StorageInterface["PhotoStorage Interface"]
+        TokenInterface["ViewerTokenProvider Interface"]
+        DomainErrors["Domain Errors"]
+    end
+
+    subgraph Infrastructure["Infrastructure（外部依存）"]
+        PrismaRepo["Prisma Repository 実装<br/>IssueRepository<br/>ProjectRepository"]
+        MinioStorage["MinIO PhotoStorage 実装"]
+        APSToken["APS TokenProvider 実装<br/>2-legged OAuth"]
+        DB[("PostgreSQL")]
+        Blob[("MinIO<br/>Blob Storage")]
+        APS["APS Cloud"]
+    end
+
+    %% Presentation → Application
+    Pages --> Queries
+    Pages --> Components
+    Components --> ViewerUI
+    APIRoutes --> Commands
+    APIRoutes --> Queries
+
+    %% Application → Domain
+    Commands --> IssueAggregate
+    Commands --> RepoInterface
+    Commands --> StorageInterface
+    Queries --> RepoInterface
+    Commands --> DTO
+    Queries --> DTO
+
+    %% Infrastructure implements Domain interfaces
+    RepoInterface -.->|implements| PrismaRepo
+    StorageInterface -.->|implements| MinioStorage
+    TokenInterface -.->|implements| APSToken
+
+    %% Infrastructure → External
+    PrismaRepo --> DB
+    MinioStorage --> Blob
+    APSToken --> APS
+
+    %% Styling
+    classDef presentationStyle fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    classDef appStyle fill:#7B68EE,stroke:#5A4CB5,color:#fff
+    classDef domainStyle fill:#F5A623,stroke:#C4841C,color:#fff
+    classDef infraStyle fill:#50C878,stroke:#3A9A5C,color:#fff
+    classDef externalStyle fill:#95A5A6,stroke:#717D7E,color:#fff
+
+    class Pages,Components,ViewerUI,APIRoutes presentationStyle
+    class CreateIssue,UpdateStatus,AddPhoto,ListBuildings,ListIssues,GetIssueDetail,ListProjects,ListFloors,DTO appStyle
+    class IssueAggregate,ProjectAggregate,ValueObjects,RepoInterface,StorageInterface,TokenInterface,DomainErrors domainStyle
+    class PrismaRepo,MinioStorage,APSToken infraStyle
+    class DB,Blob,APS externalStyle

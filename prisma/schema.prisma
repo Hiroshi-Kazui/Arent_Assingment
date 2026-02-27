@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Models ====================
+
+model Building {
+  building_id String   @id @default(uuid())
+  name        String
+  address     String
+  latitude    Decimal  @db.Decimal(10, 8)
+  longitude   Decimal  @db.Decimal(11, 8)
+  model_urn   String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  floors   Floor[]
+  projects Project[]
+
+  @@map("building")
+}
+
+model Floor {
+  floor_id      String   @id @default(uuid())
+  building_id   String
+  name          String
+  floor_number  Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  building Building @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
+  issues   Issue[]
+
+  @@map("floor")
+}
+
+model Project {
+  project_id   String   @id @default(uuid())
+  building_id  String
+  name         String
+  start_date   DateTime
+  due_date     DateTime
+  status       String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  building Building @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
+  issues   Issue[]
+
+  @@map("project")
+}
+
+model Issue {
+  issue_id           String   @id @default(uuid())
+  project_id         String
+  floor_id           String
+  title              String
+  description        String
+  issue_type         String?
+  status             String
+  location_type      String
+  db_id              Int?
+  world_position_x   Decimal? @db.Decimal(10, 2)
+  world_position_y   Decimal? @db.Decimal(10, 2)
+  world_position_z   Decimal? @db.Decimal(10, 2)
+  priority           String   @default("MEDIUM")
+  reported_by        String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  project Project @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  floor   Floor   @relation(fields: [floor_id], references: [floor_id], onDelete: Cascade)
+  photos  Photo[]
+
+  @@map("issue")
+}
+
+model Photo {
+  photo_id    String   @id @default(uuid())
+  issue_id    String
+  blob_key    String
+  photo_phase String
+  uploaded_at DateTime @default(now())
+
+  issue Issue @relation(fields: [issue_id], references: [issue_id], onDelete: Cascade)
+
+  @@map("photo")
+}

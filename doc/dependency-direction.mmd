@@ -1,0 +1,14 @@
+graph LR
+    Presentation["Presentation<br/>Next.js Pages<br/>API Routes<br/>APS Viewer SDK"]
+    Application["Application<br/>Commands<br/>Queries<br/>DTOs"]
+    Domain["Domain<br/>Issue集約<br/>Value Objects<br/>Repository IF<br/>Storage IF"]
+    Infrastructure["Infrastructure<br/>Prisma実装<br/>MinIO実装<br/>APS実装"]
+
+    Presentation -->|depends on| Application
+    Application -->|depends on| Domain
+    Infrastructure -->|implements| Domain
+
+    style Domain fill:#F5A623,stroke:#C4841C,color:#fff,stroke-width:3px
+    style Presentation fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    style Application fill:#7B68EE,stroke:#5A4CB5,color:#fff
+    style Infrastructure fill:#50C878,stroke:#3A9A5C,color:#fff
