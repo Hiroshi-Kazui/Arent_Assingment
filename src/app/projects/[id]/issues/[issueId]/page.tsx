@@ -220,17 +220,17 @@ export default function IssueDetailPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-950">
-        <p className="text-neutral-500">読み込み中...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <p className="text-muted-foreground">読み込み中...</p>
       </div>
     );
   }
 
   if (error || !issue) {
     return (
-      <div className="p-8 bg-neutral-950 min-h-screen">
-        <p className="text-red-400">エラー: {error ?? 'Issue not found'}</p>
-        <button onClick={() => router.back()} className="mt-4 text-blue-400 hover:underline">
+      <div className="p-8 bg-background min-h-screen">
+        <p className="text-destructive">エラー: {error ?? 'Issue not found'}</p>
+        <button onClick={() => router.back()} className="mt-4 text-primary hover:underline">
           ← 戻る
         </button>
       </div>

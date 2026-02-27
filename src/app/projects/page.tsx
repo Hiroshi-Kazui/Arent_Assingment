@@ -48,7 +48,7 @@ export default function ProjectListPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">読み込み中...</p>
+        <p className="text-muted-foreground">読み込み中...</p>
       </div>
     );
   }
@@ -56,7 +56,7 @@ export default function ProjectListPage() {
   if (error) {
     return (
       <div className="p-8">
-        <p className="text-red-600">エラー: {error}</p>
+        <p className="text-destructive">エラー: {error}</p>
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default function ProjectListPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {projects.length === 0 ? (
-          <p className="text-neutral-500 text-center py-16">プロジェクトが見つかりません</p>
+          <p className="text-muted-foreground text-center py-16">プロジェクトが見つかりません</p>
         ) : (
           <div className="space-y-4">
             {projects.map((project) => (

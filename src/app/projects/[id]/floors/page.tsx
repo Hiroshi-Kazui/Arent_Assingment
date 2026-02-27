@@ -98,7 +98,7 @@ export default function FloorListPage({ params }: PageProps) {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {floors.length === 0 ? (
-          <p className="text-neutral-500 text-center py-16">フロアが見つかりません</p>
+          <p className="text-muted-foreground text-center py-16">フロアが見つかりません</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {floors.map((floor) => (
