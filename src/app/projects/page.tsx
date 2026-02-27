@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface Project {
   projectId: string;
@@ -20,9 +22,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  PLANNING: 'bg-slate-100 text-slate-800',
-  ACTIVE: 'bg-blue-100 text-blue-800',
-  COMPLETED: 'bg-green-100 text-green-800',
+  PLANNING: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700 border-neutral-700',
+  ACTIVE: 'bg-primary/20 text-primary hover:bg-primary/30 border-primary/30',
+  COMPLETED: 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/40 border-blue-800/50',
 };
 
 export default function ProjectListPage() {
@@ -60,50 +62,53 @@ export default function ProjectListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-xl font-semibold text-gray-900">指摘管理ツール</h1>
-        <p className="text-sm text-gray-500 mt-1">プロジェクト一覧</p>
+      <header className="bg-card border-b px-4 sm:px-6 py-4 sticky top-0 z-10 shadow-sm">
+        <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
+        <p className="text-sm text-muted-foreground mt-1">プロジェクト一覧</p>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {projects.length === 0 ? (
-          <p className="text-gray-500 text-center py-16">プロジェクトが見つかりません</p>
+          <p className="text-neutral-500 text-center py-16">プロジェクトが見つかりません</p>
         ) : (
           <div className="space-y-4">
             {projects.map((project) => (
               <Link
                 key={project.projectId}
                 href={`/projects/${project.projectId}/floors`}
-                className="block bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-400 hover:shadow-sm transition-all"
+                className="block group"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-900">{project.name}</h2>
-                    <p className="text-sm text-gray-500 mt-1">ID: {project.projectId}</p>
-                  </div>
-                  <span
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      STATUS_COLORS[project.status] ?? 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {STATUS_LABELS[project.status] ?? project.status}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-center gap-6 text-sm text-gray-600">
-                  <span>
-                    指摘件数:{' '}
-                    <span className="font-semibold text-gray-900">{project.issueCount}</span>
-                  </span>
-                  {project.startDate && (
-                    <span>開始: {new Date(project.startDate).toLocaleDateString('ja-JP')}</span>
-                  )}
-                  {project.dueDate && (
-                    <span>期限: {new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
-                  )}
-                </div>
+                <Card className="bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
+                    <div>
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                      <CardDescription className="font-mono text-xs mt-1">ID: {project.projectId}</CardDescription>
+                    </div>
+                    <Badge variant="outline" className={`shrink-0 ${STATUS_COLORS[project.status] ?? 'bg-neutral-800 text-neutral-300'}`}>
+                      {STATUS_LABELS[project.status] ?? project.status}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground bg-black/20 p-3 rounded-lg border border-white/5">
+                      <span className="flex items-center gap-1.5">
+                        <span>指摘件数:</span>
+                        <Badge variant="secondary" className="font-mono">{project.issueCount}</Badge>
+                      </span>
+                      {project.startDate && (
+                        <span className="flex items-center gap-1.5">
+                          <span>開始:</span> <span className="text-foreground/80">{new Date(project.startDate).toLocaleDateString('ja-JP')}</span>
+                        </span>
+                      )}
+                      {project.dueDate && (
+                        <span className="flex items-center gap-1.5">
+                          <span>期限:</span> <span className="text-foreground/80">{new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </Link>
             ))}
           </div>

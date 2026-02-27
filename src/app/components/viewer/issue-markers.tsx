@@ -65,9 +65,9 @@ export function IssueMarkers({
     overlayContainer.innerHTML = '';
 
     const colors: Record<string, string> = {
-      OPEN: '#dc3545',
-      IN_PROGRESS: '#ffc107',
-      DONE: '#28a745',
+      OPEN: '#ef4444', // Tailwind red-500
+      IN_PROGRESS: '#eab308', // Safety Yellow
+      DONE: '#22c55e', // Tailwind green-500
     };
 
     markers.forEach((marker) => {

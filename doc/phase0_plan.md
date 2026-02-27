@@ -144,6 +144,7 @@ Done → InProgress : 再指摘（再オープン）
 [画面4] 指摘詳細
     │  指摘内容 + 写真表示 + ステータス変更
 ```
+※ 将来的に複数建造物を扱う場合、画面1の前に「建造物一覧」画面を追加する。最低要件では建造物1件（Aビル）のためスキップ。ドメインモデルとAPIは既にBuilding参照に対応済みのため、画面追加のみで拡張可能。
 
 ### 画面3: 3Dビュー画面の詳細仕様
 
@@ -166,6 +167,13 @@ Done → InProgress : 再指摘（再オープン）
 - 空間指摘（worldPosition）はNice to haveであることを担当者に確認済み
 - 将来的にはコンテキストメニューから空間ピン登録を追加可能な設計とする
 - ドメインモデル上はLocation Value Objectで両対応の構造を維持（課題資料4.3「両対応が望ましい」に対する設計的備え）
+
+**写真アップロード:**
+- スマホ/タブレット: アップロードボタンタップ時にOS標準メニューで「カメラで撮影」または「フォトライブラリから選択」を提示
+- PC: 通常のファイル選択ダイアログ
+- 実装: HTML5標準の `<input type="file" accept="image/*" capture="environment">` で対応。ネイティブSDK不要
+- アップロード後にプレビュー表示し、PhotoPhase（Before/After）を選択させる
+- 複数枚同時選択に対応（`multiple` 属性）
 
 ---
 
@@ -307,9 +315,6 @@ class MinioPhotoStorage implements PhotoStorage { ... }
 │   │   ├── prisma/            # DB実装
 │   │   ├── minio/             # Blob実装
 │   │   └── aps/               # APSトークン取得
-│   ├── api/
-│   │   └── utils/             # 共通APIエラーハンドリング
-│   ├── types/                 # 外部SDK型定義（forge-viewer等）
 │   └── app/                   # Next.js Presentation層
 │       ├── api/               # Route Handlers
 │       ├── components/        # UIコンポーネント
@@ -382,6 +387,7 @@ class MinioPhotoStorage implements PhotoStorage { ... }
 | 大量データ | Query側にRead Model分離。指摘一覧はページネーション + フィルタインデックス |
 | Blob | CDN経由配信。サムネイル自動生成（Azure Functions / Lambda） |
 | マスタ管理 | Building/Floor/ProjectのCRUD管理画面。最低要件ではシードデータで代替しているが、本番ではBuildingに施工者・発注者・構造種別等の詳細情報を追加し、管理UIから操作可能にする |
+| 画面拡張 | 複数建造物対応時、画面遷移の先頭に「建造物一覧」画面を追加。Building参照APIは実装済みのため、フロント側の画面追加のみで対応可能 |
 
 ---
 
