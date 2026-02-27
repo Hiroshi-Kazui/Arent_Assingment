@@ -27,6 +27,8 @@ describe('Issue - 状態遷移ロジック', () => {
         floorId,
         'Test Issue',
         'Description',
+        'quality',
+        'tester',
         location
       );
     }
@@ -38,6 +40,8 @@ describe('Issue - 状態遷移ロジック', () => {
       floorId,
       'Test Issue',
       'Description',
+      'quality',
+      'tester',
       location,
       IssuePriority.Medium,
       status,
@@ -147,6 +151,8 @@ describe('Issue - 状態遷移ロジック', () => {
         floorId,
         title,
         description,
+        'quality',
+        'tester',
         location
       );
 

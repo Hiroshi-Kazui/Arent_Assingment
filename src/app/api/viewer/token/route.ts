@@ -1,26 +1,22 @@
 import { NextResponse } from 'next/server';
-import { ApsTokenProvider } from '@/infrastructure/aps/aps-token-provider';
+import { getProviders } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
 
 export async function GET() {
   try {
-    const clientId = process.env.APS_CLIENT_ID || '';
-    const clientSecret = process.env.APS_CLIENT_SECRET || '';
-
-    if (!clientId || !clientSecret) {
+    if (!process.env.APS_CLIENT_ID || !process.env.APS_CLIENT_SECRET) {
       return NextResponse.json(
         { error: 'APS credentials not configured' },
         { status: 500 }
       );
     }
 
-    const tokenProvider = new ApsTokenProvider(clientId, clientSecret);
-    const accessToken = await tokenProvider.getAccessToken();
+    const providers = getProviders();
+    const token = await providers.viewerTokenProvider.getAccessToken();
 
     return successResponse({
-      access_token: accessToken,
-      // トークンの有効期限は通常3600秒（1時間）
-      expires_in: 3600,
+      access_token: token.token,
+      expires_in: token.expiresIn,
     });
   } catch (error) {
     return handleError(error);

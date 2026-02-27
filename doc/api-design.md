@@ -95,8 +95,11 @@
     "issueType": "quality",
     "status": "OPEN",
     "priority": "MEDIUM",
-    "locationType": "dbId",
-    "dbId": "12345",
+    "locationType": "worldPosition",
+    "worldPositionX": 12.3,
+    "worldPositionY": 45.6,
+    "worldPositionZ": 78.9,
+    "dbId": null,
     "reportedBy": "田中",
     "createdAt": "2026-02-27T00:00:00.000Z"
   }

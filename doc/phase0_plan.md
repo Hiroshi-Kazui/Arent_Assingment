@@ -307,6 +307,9 @@ class MinioPhotoStorage implements PhotoStorage { ... }
 │   │   ├── prisma/            # DB実装
 │   │   ├── minio/             # Blob実装
 │   │   └── aps/               # APSトークン取得
+│   ├── api/
+│   │   └── utils/             # 共通APIエラーハンドリング
+│   ├── types/                 # 外部SDK型定義（forge-viewer等）
 │   └── app/                   # Next.js Presentation層
 │       ├── api/               # Route Handlers
 │       ├── components/        # UIコンポーネント

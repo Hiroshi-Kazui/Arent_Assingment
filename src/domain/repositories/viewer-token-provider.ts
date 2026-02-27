@@ -6,7 +6,10 @@
 export interface ViewerTokenProvider {
   /**
    * BIM ビューア用のアクセストークンを取得
-   * @returns アクセストークン
+   * @returns アクセストークンと有効期限（秒）
    */
-  getAccessToken(): Promise<string>;
+  getAccessToken(): Promise<{
+    token: string;
+    expiresIn: number;
+  }>;
 }

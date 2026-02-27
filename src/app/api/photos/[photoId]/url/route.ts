@@ -10,7 +10,6 @@ interface Params {
 /**
  * GET /api/photos/[photoId]/url
  * Photo の署名付き URL を取得
- * クエリパラメータ: ?expirationMinutes=xxx（デフォルト: 60）
  */
 export async function GET(
   request: Request,
@@ -18,18 +17,9 @@ export async function GET(
 ) {
   try {
     const { photoId } = await params;
-    const url = new URL(request.url);
-    const expirationMinutes = parseInt(
-      url.searchParams.get('expirationMinutes') || '60',
-      10
-    );
 
     const handlers = getQueryHandlers();
-    const photoUrl = await getPhotoUrl(
-      photoId,
-      handlers.photoStorage,
-      expirationMinutes
-    );
+    const photoUrl = await getPhotoUrl(photoId, handlers.photoStorage);
 
     if (!photoUrl) {
       return NextResponse.json(

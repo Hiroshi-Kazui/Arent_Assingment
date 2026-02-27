@@ -10,8 +10,7 @@ import prisma from '../../infrastructure/prisma/prisma-client';
  */
 export async function getPhotoUrl(
   photoId: string,
-  photoStorage: PhotoStorage,
-  expirationMinutes: number = 60
+  photoStorage: PhotoStorage
 ): Promise<string | null> {
   const photo = await prisma.photo.findUnique({
     where: { photo_id: photoId as PhotoId },
@@ -21,5 +20,5 @@ export async function getPhotoUrl(
     return null;
   }
 
-  return photoStorage.getSignedUrl(photo.blob_key, expirationMinutes);
+  return photoStorage.getUrl(photo.blob_key);
 }

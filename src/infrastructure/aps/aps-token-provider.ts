@@ -11,6 +11,7 @@ export class ApsTokenProvider implements ViewerTokenProvider {
     'https://developer.api.autodesk.com/authentication/v2/token';
 
   private cachedToken: string | null = null;
+  private cachedExpiresIn: number = 0;
   private tokenExpiresAt: number = 0;
 
   constructor(clientId: string, clientSecret: string) {
@@ -18,21 +19,31 @@ export class ApsTokenProvider implements ViewerTokenProvider {
     this.clientSecret = clientSecret;
   }
 
-  async getAccessToken(): Promise<string> {
+  async getAccessToken(): Promise<{
+    token: string;
+    expiresIn: number;
+  }> {
     // 有効期限の60秒前まではキャッシュを再利用
     if (
       this.cachedToken &&
       Date.now() < this.tokenExpiresAt - 60_000
     ) {
-      return this.cachedToken;
+      return {
+        token: this.cachedToken,
+        expiresIn: this.cachedExpiresIn,
+      };
     }
 
     // 新しいトークンを取得
     const token = await this.fetchNewToken();
     this.cachedToken = token.access_token;
+    this.cachedExpiresIn = token.expires_in;
     this.tokenExpiresAt = Date.now() + token.expires_in * 1000;
 
-    return this.cachedToken;
+    return {
+      token: this.cachedToken,
+      expiresIn: this.cachedExpiresIn,
+    };
   }
 
   /**

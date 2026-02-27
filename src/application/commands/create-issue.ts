@@ -48,6 +48,8 @@ export class CreateIssueHandler {
       floorId,
       input.title,
       input.description,
+      input.issueType,
+      input.reportedBy,
       location
     );
 

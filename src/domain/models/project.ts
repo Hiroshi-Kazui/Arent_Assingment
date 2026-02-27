@@ -18,10 +18,9 @@ export const ProjectId = {
  * Project Status 列挙型
  */
 export enum ProjectStatus {
+  Planning = 'PLANNING',
   Active = 'ACTIVE',
   Completed = 'COMPLETED',
-  OnHold = 'ON_HOLD',
-  Archived = 'ARCHIVED',
 }
 
 /**

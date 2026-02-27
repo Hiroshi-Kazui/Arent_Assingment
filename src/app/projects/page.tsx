@@ -14,15 +14,15 @@ interface Project {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  PLANNING: '計画中',
   ACTIVE: '進行中',
   COMPLETED: '完了',
-  ON_HOLD: '保留中',
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  PLANNING: 'bg-slate-100 text-slate-800',
   ACTIVE: 'bg-blue-100 text-blue-800',
   COMPLETED: 'bg-green-100 text-green-800',
-  ON_HOLD: 'bg-gray-100 text-gray-800',
 };
 
 export default function ProjectListPage() {
