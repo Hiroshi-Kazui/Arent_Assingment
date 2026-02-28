@@ -77,7 +77,7 @@ export default function ProjectListPage() {
             {projects.map((project) => (
               <Link
                 key={project.projectId}
-                href={`/projects/${project.projectId}/floors`}
+                href={`/projects/${project.projectId}/viewer`}
                 className="block group"
               >
                 <Card className="bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm">

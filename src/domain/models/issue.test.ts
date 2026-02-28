@@ -28,7 +28,7 @@ describe('Issue - 状態遷移ロジック', () => {
         'Test Issue',
         'Description',
         'quality',
-        'tester',
+        1,
         location
       );
     }
@@ -41,7 +41,7 @@ describe('Issue - 状態遷移ロジック', () => {
       'Test Issue',
       'Description',
       'quality',
-      'tester',
+      1,
       location,
       IssuePriority.Medium,
       status,
@@ -152,7 +152,7 @@ describe('Issue - 状態遷移ロジック', () => {
         title,
         description,
         'quality',
-        'tester',
+        1,
         location
       );
 

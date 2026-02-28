@@ -58,8 +58,8 @@ export async function POST(
     let worldPositionX: number | undefined;
     let worldPositionY: number | undefined;
     let worldPositionZ: number | undefined;
-    let reportedBy: string | undefined;
     let files: File[] = [];
+    let photoPhase: 'BEFORE' | 'AFTER' = 'BEFORE';
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
@@ -75,7 +75,8 @@ export async function POST(
       worldPositionX = worldXRaw !== null ? Number(worldXRaw) : undefined;
       worldPositionY = worldYRaw !== null ? Number(worldYRaw) : undefined;
       worldPositionZ = worldZRaw !== null ? Number(worldZRaw) : undefined;
-      reportedBy = String(formData.get('reportedBy') || '') || undefined;
+      const photoPhaseRaw = String(formData.get('photoPhase') || 'BEFORE');
+      photoPhase = (['BEFORE', 'AFTER'].includes(photoPhaseRaw) ? photoPhaseRaw : 'BEFORE') as 'BEFORE' | 'AFTER';
       files = [
         ...formData.getAll('files').filter((v): v is File => v instanceof File),
         ...formData.getAll('file').filter((v): v is File => v instanceof File),
@@ -91,7 +92,6 @@ export async function POST(
       worldPositionX = body.worldPositionX !== undefined ? Number(body.worldPositionX) : undefined;
       worldPositionY = body.worldPositionY !== undefined ? Number(body.worldPositionY) : undefined;
       worldPositionZ = body.worldPositionZ !== undefined ? Number(body.worldPositionZ) : undefined;
-      reportedBy = body.reportedBy ? String(body.reportedBy) : undefined;
     } else {
       return NextResponse.json(
         {
@@ -128,15 +128,6 @@ export async function POST(
       );
     }
 
-    if (files.length === 0) {
-      return NextResponse.json(
-        {
-          error: 'At least one BEFORE photo is required when creating an issue',
-        },
-        { status: 400 }
-      );
-    }
-
     if (
       locationType === 'worldPosition' &&
       (worldPositionX === undefined ||
@@ -163,7 +154,6 @@ export async function POST(
       worldPositionX,
       worldPositionY,
       worldPositionZ,
-      reportedBy,
     };
 
     const handlers = getCommandHandlers();
@@ -178,7 +168,7 @@ export async function POST(
         file: buffer,
         fileName: file.name,
         contentType: file.type,
-        photoPhase: 'BEFORE',
+        photoPhase,
       });
     }
 

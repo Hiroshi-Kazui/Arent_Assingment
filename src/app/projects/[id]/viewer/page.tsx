@@ -4,8 +4,14 @@ import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
+import { IssueDetailModal } from '@/app/components/issue-detail-modal';
 import { IssueMarkers, IssueMarker } from '@/app/components/viewer/issue-markers';
 import { useFloorIsolation } from '@/app/components/viewer/use-floor-isolation';
+import {
+  useViewerInteraction,
+  type ViewerHit,
+} from '@/app/components/viewer/use-viewer-interaction';
+import { ElementInfoPanel } from '@/app/components/viewer/element-info-panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -43,7 +49,7 @@ interface Issue {
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
-  reportedBy?: string;
+  reportedBy: number;
   createdAt: string;
 }
 
@@ -80,10 +86,10 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "o
 
 const ISSUE_TYPES = ['quality', 'safety', 'construction', 'design'];
 const ISSUE_TYPE_LABELS: Record<string, string> = {
-  quality: '品質',
-  safety: '安全',
-  construction: '施工',
-  design: '設計',
+  quality: '品質不良',
+  safety: '安全不備',
+  construction: '施工不備',
+  design: '設計変更',
 };
 
 const INVALID_MODEL_URNS = new Set([
@@ -116,14 +122,20 @@ export default function ViewerPage({ params }: PageProps) {
 
   // Hover highlight state (bidirectional)
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
+  const [detailIssueId, setDetailIssueId] = useState<string | null>(null);
 
   // Issue form
   const [showForm, setShowForm] = useState(false);
   const [selectedDbId, setSelectedDbId] = useState<number | null>(null);
+  const [selectedWorldPosition, setSelectedWorldPosition] = useState<{
+    x: number;
+    y: number;
+    z: number;
+  } | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIssueType, setFormIssueType] = useState('quality');
-  const [formReportedBy, setFormReportedBy] = useState('');
+  const [formPhotoPhase, setFormPhotoPhase] = useState<'BEFORE' | 'AFTER'>('BEFORE');
   const [formFiles, setFormFiles] = useState<FileList | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -209,25 +221,37 @@ export default function ViewerPage({ params }: PageProps) {
     if (res.ok) setIssues(await res.json());
   };
 
-  // マーカークリック → 詳細画面へ
-  const handleMarkerClick = (issueId: string) => {
-    router.push(`/projects/${id}/issues/${issueId}`);
+  // マーカークリック → 詳細モーダル表示
+  const openDetailModal = (issueId: string) => {
+    setShowForm(false);
+    setDetailIssueId(issueId);
   };
 
-  // ダブルクリックで dbId 取得 → フォームを開く
-  const handleDbIdSelected = (dbId: number) => {
-    setSelectedDbId(dbId);
+  const handleMarkerClick = (issueId: string) => {
+    openDetailModal(issueId);
+  };
+
+  // 導線A: ダブルクリック/長押しで即時登録
+  const handleQuickRegister = (hit: ViewerHit) => {
+    setDetailIssueId(null);
+    setSelectedDbId(hit.dbId);
+    setSelectedWorldPosition(hit.worldPosition);
     setShowForm(true);
+  };
+
+  // 導線B: 情報パネルから登録
+  const handleRegisterFromPanel = (hit: ViewerHit) => {
+    setDetailIssueId(null);
+    setSelectedDbId(hit.dbId);
+    setSelectedWorldPosition(hit.worldPosition);
+    setShowForm(true);
+    clearSelection();
   };
 
   // フォーム送信
   const handleSubmitIssue = async () => {
     if (!formTitle.trim() || !formDescription.trim()) {
       alert('タイトルと説明を入力してください');
-      return;
-    }
-    if (!formFiles || formFiles.length === 0) {
-      alert('指摘写真（是正前）を1枚以上選択してください');
       return;
     }
     if (!selectedFloorId) {
@@ -245,15 +269,22 @@ export default function ViewerPage({ params }: PageProps) {
       if (selectedDbId !== null) {
         fd.append('locationType', 'dbId');
         fd.append('dbId', String(selectedDbId));
+        if (selectedWorldPosition) {
+          fd.append('worldPositionX', String(selectedWorldPosition.x));
+          fd.append('worldPositionY', String(selectedWorldPosition.y));
+          fd.append('worldPositionZ', String(selectedWorldPosition.z));
+        }
       } else {
         fd.append('locationType', 'worldPosition');
-        fd.append('worldPositionX', '0');
-        fd.append('worldPositionY', '0');
-        fd.append('worldPositionZ', '0');
+        fd.append('worldPositionX', String(selectedWorldPosition?.x ?? 0));
+        fd.append('worldPositionY', String(selectedWorldPosition?.y ?? 0));
+        fd.append('worldPositionZ', String(selectedWorldPosition?.z ?? 0));
       }
-      fd.append('reportedBy', formReportedBy || 'unknown');
-      for (const file of Array.from(formFiles)) {
-        fd.append('files', file);
+      if (formFiles && formFiles.length > 0) {
+        fd.append('photoPhase', formPhotoPhase);
+        for (const file of Array.from(formFiles)) {
+          fd.append('files', file);
+        }
       }
 
       const res = await fetch(`/api/projects/${id}/issues`, {
@@ -270,11 +301,13 @@ export default function ViewerPage({ params }: PageProps) {
       setFormTitle('');
       setFormDescription('');
       setFormIssueType('quality');
-      setFormReportedBy('');
+      setFormPhotoPhase('BEFORE');
       setFormFiles(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setShowForm(false);
       setSelectedDbId(null);
+      setSelectedWorldPosition(null);
+      clearSelection();
 
       await refreshIssues();
     } catch (err) {
@@ -321,6 +354,12 @@ export default function ViewerPage({ params }: PageProps) {
         : [],
     [floorMappingReady, floors, floorsWithElements]
   );
+  const { selectedElement, clearSelection } = useViewerInteraction({
+    viewer,
+    viewerContainer,
+    dbIdFilter: isDbIdOnSelectedFloor,
+    onQuickRegister: handleQuickRegister,
+  });
   const modelUrn = isValidModelUrn(project?.building.modelUrn)
     ? project.building.modelUrn
     : isValidModelUrn(process.env.NEXT_PUBLIC_APS_MODEL_URN)
@@ -348,9 +387,7 @@ export default function ViewerPage({ params }: PageProps) {
                 }`}
               onMouseEnter={() => setHoveredIssueId(issue.issueId)}
               onMouseLeave={() => setHoveredIssueId(null)}
-              onClick={() =>
-                router.push(`/projects/${id}/issues/${issue.issueId}`)
-              }
+              onClick={() => openDetailModal(issue.issueId)}
             >
               <div className="flex items-start justify-between gap-3 mb-2">
                 <p className={`text-sm font-medium transition-colors line-clamp-2 pr-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
@@ -391,15 +428,15 @@ export default function ViewerPage({ params }: PageProps) {
             プロジェクト一覧
           </Link>
           <span className="opacity-50">/</span>
-          <Link href={`/projects/${id}/floors`} className="hover:text-primary transition-colors">
-            {project?.name ?? id}
-          </Link>
-          <span className="opacity-50">/</span>
-          <span className="text-foreground/80">3Dビュー</span>
+          <span className="text-foreground/80">{project?.name ?? id}</span>
         </div>
 
         <Button
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setSelectedDbId(null);
+            setSelectedWorldPosition(null);
+            setShowForm(true);
+          }}
           className="sm:ml-auto shrink-0 font-medium hidden sm:flex"
         >
           + 新規指摘
@@ -423,9 +460,6 @@ export default function ViewerPage({ params }: PageProps) {
           ) : (
             <ApsViewer
               modelUrn={modelUrn}
-              onDbIdSelected={handleDbIdSelected}
-              dbIdFilter={isDbIdOnSelectedFloor}
-              onMarkerClick={handleMarkerClick}
               onViewerReady={setViewer}
               onContainerReady={setViewerContainer}
             />
@@ -483,6 +517,15 @@ export default function ViewerPage({ params }: PageProps) {
               onMarkerHover={setHoveredIssueId}
             />
           )}
+
+          {viewer && selectedElement && (
+            <ElementInfoPanel
+              viewer={viewer}
+              element={selectedElement}
+              onRegister={handleRegisterFromPanel}
+              onClose={clearSelection}
+            />
+          )}
         </div>
 
         {/* Issue list panel (PC: Side panel, Mobile: Hidden) */}
@@ -531,13 +574,29 @@ export default function ViewerPage({ params }: PageProps) {
       {/* Mobile FAB */}
       <Button
         className="sm:hidden fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg z-40 flex items-center justify-center p-0"
-        onClick={() => setShowForm(true)}
+        onClick={() => {
+          setSelectedDbId(null);
+          setSelectedWorldPosition(null);
+          setShowForm(true);
+        }}
       >
         <Plus className="w-7 h-7" />
       </Button>
 
       {/* Issue registration modal */}
-      <Dialog open={showForm} onOpenChange={(open) => !submitting && setShowForm(open)}>
+      <Dialog
+        open={showForm}
+        onOpenChange={(open) => {
+          if (submitting) {
+            return;
+          }
+          setShowForm(open);
+          if (!open) {
+            setSelectedDbId(null);
+            setSelectedWorldPosition(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-lg overflow-hidden flex flex-col max-h-[90vh] p-0 gap-0 border-border">
           <DialogHeader className="p-6 pb-4 border-b bg-muted/20 shrink-0">
             <DialogTitle>新しい指摘を追加</DialogTitle>
@@ -545,21 +604,9 @@ export default function ViewerPage({ params }: PageProps) {
 
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-5 px-1">
-              {selectedDbId !== null && (
-                <div className="bg-muted/50 p-3 rounded-md border">
-                  <label className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">部材 ID (dbId)</label>
-                  <Input
-                    type="text"
-                    value={selectedDbId}
-                    readOnly
-                    className="w-full bg-transparent border-0 text-foreground font-mono text-sm focus-visible:ring-0 p-0 h-auto"
-                  />
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-                  タイトル <span className="text-destructive">*</span>
+                  指摘タイトル <span className="text-destructive">*</span>
                 </label>
                 <Input
                   type="text"
@@ -572,7 +619,7 @@ export default function ViewerPage({ params }: PageProps) {
 
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-                  説明 <span className="text-destructive">*</span>
+                  指摘内容 <span className="text-destructive">*</span>
                 </label>
                 <Textarea
                   value={formDescription}
@@ -584,49 +631,48 @@ export default function ViewerPage({ params }: PageProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">種別</label>
-                  <Select
-                    value={formIssueType}
-                    onValueChange={setFormIssueType}
-                    disabled={submitting}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ISSUE_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {ISSUE_TYPE_LABELS[t]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">報告者</label>
-                  <Input
-                    type="text"
-                    value={formReportedBy}
-                    onChange={(e) => setFormReportedBy(e.target.value)}
-                    disabled={submitting}
-                    placeholder="氏名を入力"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  指摘種別 <span className="text-destructive">*</span>
+                </label>
+                <Select
+                  value={formIssueType}
+                  onValueChange={setFormIssueType}
+                  disabled={submitting}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ISSUE_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {ISSUE_TYPE_LABELS[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-                  写真（是正前） <span className="text-destructive">*</span>
-                </label>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">写真</label>
+                <Select
+                  value={formPhotoPhase}
+                  onValueChange={(value) => setFormPhotoPhase(value as 'BEFORE' | 'AFTER')}
+                  disabled={submitting}
+                >
+                  <SelectTrigger className="w-full mb-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BEFORE">是正前</SelectItem>
+                    <SelectItem value="AFTER">是正後</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="border rounded-md p-2 focus-within:ring-1 focus-within:ring-ring bg-background">
                   <Input
                     type="file"
                     accept="image/*"
                     multiple
-                    required
                     ref={fileInputRef}
                     onChange={(e) => setFormFiles(e.target.files)}
                     disabled={submitting}
@@ -640,20 +686,34 @@ export default function ViewerPage({ params }: PageProps) {
           <DialogFooter className="p-6 pt-4 border-t bg-muted/20 shrink-0 gap-2 sm:gap-0">
             <Button
               variant="outline"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false);
+                setSelectedDbId(null);
+                setSelectedWorldPosition(null);
+              }}
               disabled={submitting}
             >
               キャンセル
             </Button>
             <Button
               onClick={handleSubmitIssue}
-              disabled={submitting || !formFiles || formFiles.length === 0}
+              disabled={submitting}
             >
               {submitting ? '作成中...' : '作成する'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <IssueDetailModal
+        open={detailIssueId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailIssueId(null);
+        }}
+        issueId={detailIssueId ?? ''}
+        projectId={id}
+        onIssueUpdated={refreshIssues}
+      />
 
     </div>
   );

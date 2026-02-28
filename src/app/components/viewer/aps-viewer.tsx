@@ -4,9 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 
 interface ApsViewerProps {
   modelUrn: string;
-  onMarkerClick?: (issueId: string) => void;
-  onDbIdSelected?: (dbId: number) => void;
-  dbIdFilter?: (dbId: number) => boolean;
   onViewerReady?: (viewer: Autodesk.Viewing.GuiViewer3D) => void;
   onContainerReady?: (container: HTMLElement) => void;
 }
@@ -73,27 +70,13 @@ function ensureViewerSdkLoaded(): Promise<void> {
  */
 export function ApsViewer({
   modelUrn,
-  onDbIdSelected,
-  dbIdFilter,
   onViewerReady,
   onContainerReady,
 }: ApsViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Autodesk.Viewing.GuiViewer3D | null>(null);
-  const onDbIdSelectedRef = useRef<ApsViewerProps['onDbIdSelected']>(
-    onDbIdSelected
-  );
-  const dbIdFilterRef = useRef<ApsViewerProps['dbIdFilter']>(dbIdFilter);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    onDbIdSelectedRef.current = onDbIdSelected;
-  }, [onDbIdSelected]);
-
-  useEffect(() => {
-    dbIdFilterRef.current = dbIdFilter;
-  }, [dbIdFilter]);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -102,7 +85,6 @@ export function ApsViewer({
     }
 
     const initializeViewer = async () => {
-      let dblClickHandler: ((event: MouseEvent) => void) | null = null;
       try {
         setLoading(true);
         setError(null);
@@ -212,22 +194,6 @@ export function ApsViewer({
             );
             setLoading(false);
           }
-
-          // ダブルクリックでdbID取得
-          dblClickHandler = (event: MouseEvent) => {
-            const hit = (viewer.impl as any).hitTest(
-              event.offsetX,
-              event.offsetY,
-              true
-            );
-            if (hit?.dbId) {
-              if (dbIdFilterRef.current && !dbIdFilterRef.current(hit.dbId)) {
-                return;
-              }
-              onDbIdSelectedRef.current?.(hit.dbId);
-            }
-          };
-          containerRef.current?.addEventListener('dblclick', dblClickHandler);
         });
       } catch (err) {
         console.error('Error initializing viewer:', err);
@@ -322,4 +288,3 @@ function findViewableNode(
 
   return null;
 }
-

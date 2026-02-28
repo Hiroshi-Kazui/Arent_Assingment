@@ -49,7 +49,7 @@ export class CreateIssueHandler {
       input.title,
       input.description,
       input.issueType,
-      input.reportedBy,
+      1,
       location
     );
 

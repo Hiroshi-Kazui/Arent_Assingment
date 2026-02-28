@@ -38,7 +38,7 @@ export async function listIssues(
     worldPositionZ: issue.world_position_z
       ? Number(issue.world_position_z)
       : undefined,
-    reportedBy: issue.reported_by ?? undefined,
+    reportedBy: Number(issue.reported_by),
     createdAt: issue.created_at,
   }));
 }

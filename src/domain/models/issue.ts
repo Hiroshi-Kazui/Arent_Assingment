@@ -51,7 +51,7 @@ export class Issue {
     readonly title: string,
     readonly description: string,
     readonly issueType: string | undefined,
-    readonly reportedBy: string | undefined,
+    readonly reportedBy: number,
     readonly location: Location,
     readonly priority: IssuePriority,
     readonly status: IssueStatus,
@@ -69,7 +69,7 @@ export class Issue {
     title: string,
     description: string,
     issueType: string | undefined,
-    reportedBy: string | undefined,
+    reportedBy: number,
     location: Location,
     priority: IssuePriority = IssuePriority.Medium
   ): Issue {
@@ -108,7 +108,7 @@ export class Issue {
     title: string,
     description: string,
     issueType: string | undefined,
-    reportedBy: string | undefined,
+    reportedBy: number,
     location: Location,
     priority: IssuePriority,
     status: IssueStatus,

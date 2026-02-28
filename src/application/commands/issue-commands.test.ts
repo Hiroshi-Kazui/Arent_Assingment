@@ -73,7 +73,6 @@ describe('Issue Commands - 統合テスト', () => {
       worldPositionX: 10.5,
       worldPositionY: 20.5,
       worldPositionZ: 30.5,
-      reportedBy: 'tester@example.com',
     };
 
     createdIssueId = await createIssueHandler.execute(input);

@@ -52,6 +52,8 @@ declare global {
         selector: ElementSelector;
         canvas: HTMLCanvasElement;
         camera: any;
+        hitTest(x: number, y: number, ignoreTransparent?: boolean): HitTestResult | null;
+        worldToClient(point: any): { x: number; y: number } | null;
       }
 
       interface ElementSelector {
@@ -89,11 +91,21 @@ declare global {
       interface PropertyItem {
         displayName: string;
         displayValue: string | number | boolean | null;
+        displayCategory: string;
       }
 
       interface PropertyResult {
         dbId: number;
+        name: string;
+        externalId: string;
         properties: PropertyItem[];
+      }
+
+      interface HitTestResult {
+        dbId: number;
+        point: { x: number; y: number; z: number };
+        face: any;
+        fragId: number;
       }
 
       interface FragmentList {
@@ -142,6 +154,7 @@ declare global {
       const VIEWER_INITIALIZED: string;
       const GEOMETRY_LOADED_EVENT: string;
       const CAMERA_CHANGE_EVENT: string;
+      const SELECTION_CHANGED_EVENT: string;
     }
   }
 }

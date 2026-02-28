@@ -43,7 +43,7 @@ interface IssueDetail {
   worldPositionY?: number;
   worldPositionZ?: number;
   floorId: string;
-  reportedBy?: string;
+  reportedBy: number;
   createdAt: string;
   photos: Photo[];
 }
@@ -61,10 +61,10 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "o
 };
 
 const ISSUE_TYPE_LABELS: Record<string, string> = {
-  quality: '品質',
-  safety: '安全',
-  construction: '施工',
-  design: '設計',
+  quality: '品質不良',
+  safety: '安全不備',
+  construction: '施工不備',
+  design: '設計変更',
 };
 
 // 現在ステータスから遷移可能なステータス一覧
@@ -302,10 +302,6 @@ export default function IssueDetailPage({ params }: PageProps) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8 bg-muted/10 p-4 sm:p-5 rounded-md border">
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">報告者</p>
-                  <p className="text-foreground font-medium">{issue.reportedBy ?? '—'}</p>
-                </div>
                 <div>
                   <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">作成日時</p>
                   <p className="text-foreground font-medium">

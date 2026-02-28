@@ -14,7 +14,6 @@ export interface CreateIssueInput {
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
-  reportedBy?: string;
 }
 
 /**
@@ -40,7 +39,7 @@ export interface IssueListItemDto {
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
-  reportedBy?: string;
+  reportedBy: number;
   createdAt: Date;
 }
 

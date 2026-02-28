@@ -128,7 +128,7 @@ export class PrismaIssueRepository implements IIssueRepository {
       record.title,
       record.description,
       record.issue_type ?? undefined,
-      record.reported_by ?? undefined,
+      Number(record.reported_by),
       location,
       record.priority as IssuePriority,
       record.status as IssueStatus,

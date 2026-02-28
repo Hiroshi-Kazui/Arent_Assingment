@@ -49,7 +49,8 @@
       "Bash(npm install -D tailwindcss postcss autoprefixer)",
       "Bash(npx next build)",
       "Bash(npm install -D @tailwindcss/postcss)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(xargs grep -l \"input type.*file\\\\|photoPhase\\\\|FormData\")"
     ]
   }
 }
