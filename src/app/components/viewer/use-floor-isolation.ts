@@ -179,6 +179,7 @@ export function useFloorIsolation({
       return;
     }
 
+    console.log(`[FloorIsolation] フロア ${selectedFloorNumber}: ${dbIds.size} 個の要素を表示します。`);
     isolateWithGhosting(viewer, Array.from(dbIds), true);
   }, [viewer, selectedFloorNumber, floorMappingReady]);
 
