@@ -48,7 +48,8 @@
       "Bash(npm run build)",
       "Bash(npm install -D tailwindcss postcss autoprefixer)",
       "Bash(npx next build)",
-      "Bash(npm install -D @tailwindcss/postcss)"
+      "Bash(npm install -D @tailwindcss/postcss)",
+      "Bash(git push)"
     ]
   }
 }

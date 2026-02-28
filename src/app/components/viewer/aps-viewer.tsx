@@ -6,6 +6,7 @@ interface ApsViewerProps {
   modelUrn: string;
   onMarkerClick?: (issueId: string) => void;
   onDbIdSelected?: (dbId: number) => void;
+  dbIdFilter?: (dbId: number) => boolean;
   onViewerReady?: (viewer: Autodesk.Viewing.GuiViewer3D) => void;
   onContainerReady?: (container: HTMLElement) => void;
 }
@@ -73,6 +74,7 @@ function ensureViewerSdkLoaded(): Promise<void> {
 export function ApsViewer({
   modelUrn,
   onDbIdSelected,
+  dbIdFilter,
   onViewerReady,
   onContainerReady,
 }: ApsViewerProps) {
@@ -81,12 +83,17 @@ export function ApsViewer({
   const onDbIdSelectedRef = useRef<ApsViewerProps['onDbIdSelected']>(
     onDbIdSelected
   );
+  const dbIdFilterRef = useRef<ApsViewerProps['dbIdFilter']>(dbIdFilter);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     onDbIdSelectedRef.current = onDbIdSelected;
   }, [onDbIdSelected]);
+
+  useEffect(() => {
+    dbIdFilterRef.current = dbIdFilter;
+  }, [dbIdFilter]);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -127,10 +134,16 @@ export function ApsViewer({
 
           // GuiViewer3D を作成
           const viewer = new Autodesk.Viewing.GuiViewer3D(
-            containerRef.current
+            containerRef.current,
+            { viewCubeUi: false }
           );
           viewerRef.current = viewer;
           (viewer as any).start();
+
+          // ViewCube（コンパスNアイコン）をCSS非表示
+          const vcStyle = document.createElement('style');
+          vcStyle.textContent = '.viewcubeWrapper, .adsk-viewing-viewer .viewcubeWrapper { display: none !important; }';
+          containerRef.current.appendChild(vcStyle);
 
           // Callback: コンテナとビューアーが準備完了
           if (onContainerReady && containerRef.current) {
@@ -207,8 +220,11 @@ export function ApsViewer({
               event.offsetY,
               true
             );
-            if (hit?.dbId && onDbIdSelectedRef.current) {
-              onDbIdSelectedRef.current(hit.dbId);
+            if (hit?.dbId) {
+              if (dbIdFilterRef.current && !dbIdFilterRef.current(hit.dbId)) {
+                return;
+              }
+              onDbIdSelectedRef.current?.(hit.dbId);
             }
           };
           containerRef.current?.addEventListener('dblclick', dblClickHandler);
@@ -306,3 +322,4 @@ function findViewableNode(
 
   return null;
 }
+

@@ -22,6 +22,16 @@ declare global {
         addEventListener(event: string, callback: Function): void;
         removeEventListener(event: string, callback: Function): void;
         getSelection(): number[];
+        isolate(dbIds?: number[]): void;
+        showAll(): void;
+        setGhosting(enable: boolean): void;
+        select(dbIds: number[]): void;
+        fitToView(dbIds?: number[]): void;
+        getProperties(
+          dbId: number,
+          onSuccess: (result: PropertyResult) => void,
+          onError?: (error: any) => void
+        ): void;
         addEventListener(event: 'selection', callback: (event: SelectionChangeEvent) => void): void;
 
         // Extensions
@@ -53,15 +63,37 @@ declare global {
         getFragmentList(): FragmentList;
         getBoundingBox(): any;
         getFragmentTree(): any;
+        getBulkProperties(
+          dbIds: number[],
+          options: { propFilter?: string[] },
+          onSuccess: (results: PropertyResult[]) => void,
+          onError?: (error: any) => void
+        ): void;
       }
 
       interface InstanceTree {
+        getRootId(): number;
         getNodeName(nodeId: number): string;
         getChildCount(nodeId: number): number;
         getChildren(nodeId: number): number[];
         getParent(nodeId: number): number;
         getNodeBox(nodeId: number): any;
+        enumNodeChildren(
+          nodeId: number,
+          callback: (childId: number) => void,
+          recursive?: boolean
+        ): void;
         enumNodeFragments(nodeId: number, callback: (fragmentId: number) => void): void;
+      }
+
+      interface PropertyItem {
+        displayName: string;
+        displayValue: string | number | boolean | null;
+      }
+
+      interface PropertyResult {
+        dbId: number;
+        properties: PropertyItem[];
       }
 
       interface FragmentList {
@@ -108,6 +140,7 @@ declare global {
       const VIEWER_UNINITIALIZED: string;
       const VIEWER_INITIALIZING: string;
       const VIEWER_INITIALIZED: string;
+      const GEOMETRY_LOADED_EVENT: string;
       const CAMERA_CHANGE_EVENT: string;
     }
   }

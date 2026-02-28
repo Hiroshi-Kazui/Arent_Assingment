@@ -1,12 +1,12 @@
 'use client';
 
-import { use, useEffect, useRef, useState } from 'react';
+import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
 import { IssueMarkers, IssueMarker } from '@/app/components/viewer/issue-markers';
+import { useFloorIsolation } from '@/app/components/viewer/use-floor-isolation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -146,7 +146,7 @@ export default function ViewerPage({ params }: PageProps) {
           );
           if (floorsRes.ok) {
             const floorsData: Floor[] = await floorsRes.json();
-            setFloors(floorsData.sort((a, b) => a.floorNumber - b.floorNumber));
+            setFloors(floorsData.sort((a, b) => b.floorNumber - a.floorNumber));
           }
         }
 
@@ -302,6 +302,25 @@ export default function ViewerPage({ params }: PageProps) {
   }));
 
   const currentFloor = floors.find((f) => f.floorId === selectedFloorId);
+  const selectedFloorNumber = currentFloor?.floorNumber ?? null;
+  const {
+    isDbIdOnSelectedFloor,
+    floorMappingReady,
+    floorMappingError,
+    floorsWithElements,
+  } =
+    useFloorIsolation({
+      viewer,
+      selectedFloorNumber,
+      floors,
+    });
+  const availableFloors = useMemo(
+    () =>
+      floorMappingReady
+        ? floors.filter((floor) => floorsWithElements.has(floor.floorNumber))
+        : [],
+    [floorMappingReady, floors, floorsWithElements]
+  );
   const modelUrn = isValidModelUrn(project?.building.modelUrn)
     ? project.building.modelUrn
     : isValidModelUrn(process.env.NEXT_PUBLIC_APS_MODEL_URN)
@@ -352,6 +371,17 @@ export default function ViewerPage({ params }: PageProps) {
     </ScrollArea>
   );
 
+  useEffect(() => {
+    if (!floorMappingReady || !selectedFloorId) {
+      return;
+    }
+
+    const current = floors.find((floor) => floor.floorId === selectedFloorId);
+    if (current && !floorsWithElements.has(current.floorNumber)) {
+      handleFloorChange('');
+    }
+  }, [floorMappingReady, selectedFloorId, floors, floorsWithElements]);
+
   return (
     <div className="flex flex-col h-screen bg-background pb-[60px] sm:pb-0">
       {/* Header */}
@@ -368,33 +398,9 @@ export default function ViewerPage({ params }: PageProps) {
           <span className="text-foreground/80">3Dビュー</span>
         </div>
 
-        {/* フロア選択 */}
-        {floors.length > 0 && (
-          <div className="sm:ml-auto w-full sm:w-56 shrink-0">
-            <Select
-              value={selectedFloorId ?? '__ALL_FLOORS__'}
-              onValueChange={(value) =>
-                handleFloorChange(value === '__ALL_FLOORS__' ? '' : value)
-              }
-            >
-              <SelectTrigger className="w-full h-10">
-                <SelectValue placeholder="フロアを選択" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__ALL_FLOORS__">フロアを選択</SelectItem>
-                {floors.map((f) => (
-                  <SelectItem key={f.floorId} value={f.floorId}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
         <Button
           onClick={() => setShowForm(true)}
-          className="ml-2 shrink-0 font-medium hidden sm:flex"
+          className="sm:ml-auto shrink-0 font-medium hidden sm:flex"
         >
           + 新規指摘
         </Button>
@@ -418,10 +424,53 @@ export default function ViewerPage({ params }: PageProps) {
             <ApsViewer
               modelUrn={modelUrn}
               onDbIdSelected={handleDbIdSelected}
+              dbIdFilter={isDbIdOnSelectedFloor}
               onMarkerClick={handleMarkerClick}
               onViewerReady={setViewer}
               onContainerReady={setViewerContainer}
             />
+          )}
+
+          {selectedFloorNumber !== null && viewer && !floorMappingReady && (
+            <div className="absolute top-3 right-3 z-20 rounded-md bg-background/90 border px-3 py-1 text-xs text-muted-foreground">
+              フロア要素を解析中...
+            </div>
+          )}
+
+          {selectedFloorNumber !== null && floorMappingError && (
+            <div className="absolute top-3 left-3 z-20 rounded-md bg-amber-50 border border-amber-200 px-3 py-1 text-xs text-amber-800">
+              フロア情報の解析に失敗したため、全要素を選択可能にしています
+            </div>
+          )}
+
+          {floorMappingReady && availableFloors.length > 0 && (
+            <div className="absolute bottom-4 left-4 z-20 rounded-lg border bg-background/90 shadow-sm p-1.5 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => handleFloorChange('')}
+                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                  !selectedFloorId
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                全フロア
+              </button>
+              {availableFloors.map((floor) => (
+                <button
+                  key={floor.floorId}
+                  type="button"
+                  onClick={() => handleFloorChange(floor.floorId)}
+                  className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
+                    selectedFloorId === floor.floorId
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {floor.name}
+                </button>
+              ))}
+            </div>
           )}
 
           {viewerContainer && viewer && (
