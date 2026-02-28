@@ -62,7 +62,8 @@ export class ApsTokenProvider implements ViewerTokenProvider {
         client_id: this.clientId,
         client_secret: this.clientSecret,
         grant_type: 'client_credentials',
-        scope: 'data:read',
+        // Viewer + Model Derivative の取得に必要なスコープ
+        scope: 'data:read viewables:read',
       }).toString(),
     });
 

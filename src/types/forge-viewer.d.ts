@@ -9,7 +9,7 @@ declare global {
       function Initializer(options: InitializerOptions, callback: () => void): void;
 
       interface InitializerOptions {
-        env: 'AutodeskProduction' | 'AutodeskDevelopment';
+        env: 'AutodeskProduction' | 'AutodeskProduction2' | 'AutodeskDevelopment';
         accessToken: string;
         api?: string;
         getAccessToken: (callback: (token: string, expires: number) => void) => void;

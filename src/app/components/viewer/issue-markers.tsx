@@ -198,20 +198,22 @@ function updateMarkerPosition(
             const cx = (bbox.min.x + bbox.max.x) / 2;
             const cy = (bbox.min.y + bbox.max.y) / 2;
             const cz = (bbox.min.z + bbox.max.z) / 2;
-            worldPos = viewer.impl.camera.getWorldToScreenPoint(
+            const screenPt = (viewer.impl as any).worldToClient(
               new THREE.Vector3(cx, cy, cz)
             );
+            if (screenPt) worldPos = { x: screenPt.x, y: screenPt.y };
           }
         }
       }
     } else if (marker.worldPosition) {
-      worldPos = viewer.impl.camera.getWorldToScreenPoint(
+      const screenPt = (viewer.impl as any).worldToClient(
         new THREE.Vector3(
           marker.worldPosition.x,
           marker.worldPosition.y,
           marker.worldPosition.z
         )
       );
+      if (screenPt) worldPos = { x: screenPt.x, y: screenPt.y };
     }
 
     if (worldPos) {

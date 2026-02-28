@@ -242,9 +242,14 @@ export default function ViewerPage({ params }: PageProps) {
       fd.append('title', formTitle);
       fd.append('description', formDescription);
       fd.append('issueType', formIssueType);
-      fd.append('locationType', 'dbId');
       if (selectedDbId !== null) {
+        fd.append('locationType', 'dbId');
         fd.append('dbId', String(selectedDbId));
+      } else {
+        fd.append('locationType', 'worldPosition');
+        fd.append('worldPositionX', '0');
+        fd.append('worldPositionY', '0');
+        fd.append('worldPositionZ', '0');
       }
       fd.append('reportedBy', formReportedBy || 'unknown');
       for (const file of Array.from(formFiles)) {
