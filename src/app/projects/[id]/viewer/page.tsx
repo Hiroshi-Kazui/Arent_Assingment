@@ -478,15 +478,14 @@ export default function ViewerPage({ params }: PageProps) {
           )}
 
           {floorMappingReady && availableFloors.length > 0 && (
-            <div className="absolute bottom-4 left-4 z-20 rounded-lg border bg-background/90 shadow-sm p-1.5 flex flex-col gap-1">
+            <div className="absolute bottom-16 left-4 z-20 rounded-lg border bg-background/90 shadow-sm p-1.5 flex flex-col gap-1">
               <button
                 type="button"
                 onClick={() => handleFloorChange('')}
-                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                  !selectedFloorId
+                className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${!selectedFloorId
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
-                }`}
+                  }`}
               >
                 全フロア
               </button>
@@ -495,11 +494,10 @@ export default function ViewerPage({ params }: PageProps) {
                   key={floor.floorId}
                   type="button"
                   onClick={() => handleFloorChange(floor.floorId)}
-                  className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${
-                    selectedFloorId === floor.floorId
+                  className={`px-3 py-1.5 text-xs rounded-md text-left transition-colors ${selectedFloorId === floor.floorId
                       ? 'bg-primary text-primary-foreground'
                       : 'hover:bg-muted'
-                  }`}
+                    }`}
                 >
                   {floor.name}
                 </button>
