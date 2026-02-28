@@ -10,7 +10,13 @@ async function main() {
   // Building を作成
   const building = await prisma.building.upsert({
     where: { building_id: BUILDING_ID },
-    update: {},
+    update: {
+      name: 'Aビル',
+      address: 'Tokyo, Japan',
+      latitude: '35.6762',
+      longitude: '139.7674',
+      model_urn: process.env.APS_MODEL_URN || 'default-model-urn',
+    },
     create: {
       building_id: BUILDING_ID,
       name: 'Aビル',

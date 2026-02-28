@@ -86,6 +86,16 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   design: '設計',
 };
 
+const INVALID_MODEL_URNS = new Set([
+  'YOUR_MODEL_URN_HERE',
+  'your_model_urn',
+  'default-model-urn',
+]);
+
+function isValidModelUrn(value: string | undefined | null): value is string {
+  return !!value && !INVALID_MODEL_URNS.has(value.trim());
+}
+
 export default function ViewerPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
@@ -287,10 +297,11 @@ export default function ViewerPage({ params }: PageProps) {
   }));
 
   const currentFloor = floors.find((f) => f.floorId === selectedFloorId);
-  const modelUrn =
-    project?.building.modelUrn ??
-    process.env.NEXT_PUBLIC_APS_MODEL_URN ??
-    'YOUR_MODEL_URN_HERE';
+  const modelUrn = isValidModelUrn(project?.building.modelUrn)
+    ? project.building.modelUrn
+    : isValidModelUrn(process.env.NEXT_PUBLIC_APS_MODEL_URN)
+      ? process.env.NEXT_PUBLIC_APS_MODEL_URN
+      : '';
 
   // 指摘一覧コンテンツ（PCとモバイルで共有）
   const issueListContent = (
@@ -391,6 +402,12 @@ export default function ViewerPage({ params }: PageProps) {
           {error ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-destructive">{error}</p>
+            </div>
+          ) : !modelUrn ? (
+            <div className="flex items-center justify-center h-full p-4">
+              <p className="text-destructive text-center">
+                3DモデルURNが未設定です。`APS_MODEL_URN` を設定し、DBの Building.model_urn を更新してください。
+              </p>
             </div>
           ) : (
             <ApsViewer

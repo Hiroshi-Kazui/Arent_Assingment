@@ -107,7 +107,14 @@ export function ApsViewer({
                 },
                 (error: any) => {
                   console.error('Document load error:', error);
-                  setError(`Failed to load document: ${error.message}`);
+                  const details =
+                    typeof error === 'string'
+                      ? error
+                      : error?.message ??
+                        error?.statusText ??
+                        error?.code ??
+                        JSON.stringify(error);
+                  setError(`Failed to load document: ${details}`);
                   setLoading(false);
                 }
               );
