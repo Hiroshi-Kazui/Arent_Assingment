@@ -12,6 +12,16 @@ interface Params {
   id: string;
 }
 
+const ALLOWED_PHOTO_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
+function getFileExtension(fileName: string): string {
+  const parts = fileName.split('.');
+  if (parts.length <= 1) {
+    return '';
+  }
+  return parts[parts.length - 1].toLowerCase();
+}
+
 /**
  * GET /api/projects/[id]/issues
  * 指定プロジェクトの Issue 一覧を取得
@@ -141,6 +151,39 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    // 業務ルール: 指摘登録時は施工前写真（BEFORE）が1枚以上必須
+    if (files.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'At least one BEFORE photo is required to create an issue',
+        },
+        { status: 400 }
+      );
+    }
+    if (photoPhase !== 'BEFORE') {
+      return NextResponse.json(
+        {
+          error:
+            'Issue creation photos must be uploaded as BEFORE',
+        },
+        { status: 400 }
+      );
+    }
+
+    for (const file of files) {
+      const ext = getFileExtension(file.name);
+      if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const input: CreateIssueInput = {

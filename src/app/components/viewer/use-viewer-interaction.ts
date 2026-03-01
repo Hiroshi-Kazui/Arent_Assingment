@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface ViewerHit {
-  dbId: number;
+  dbId: number | null;
   worldPosition: { x: number; y: number; z: number };
 }
 
@@ -22,6 +22,7 @@ interface UseViewerInteractionResult {
 const SINGLE_CLICK_DEBOUNCE_MS = 200;
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_MOVE_THRESHOLD_PX = 5;
+const DOUBLE_TAP_THRESHOLD_MS = 300;
 
 export function useViewerInteraction({
   viewer,
@@ -41,6 +42,7 @@ export function useViewerInteraction({
   const latestPointerRef = useRef<{ clientX: number; clientY: number } | null>(
     null
   );
+  const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
     dbIdFilterRef.current = dbIdFilter;
@@ -79,34 +81,35 @@ export function useViewerInteraction({
       }
 
       const hit = viewer.impl.hitTest(x, y, true);
-      if (!hit?.dbId) {
-        return null;
+      if (typeof hit?.dbId === 'number') {
+        const passesFilter =
+          !dbIdFilterRef.current || dbIdFilterRef.current(hit.dbId);
+        if (passesFilter) {
+          const worldPosition = hit.point
+            ? {
+                x: hit.point.x,
+                y: hit.point.y,
+                z: hit.point.z,
+              }
+            : getDbIdWorldPosition(viewer, hit.dbId);
+          if (worldPosition) {
+            return {
+              dbId: hit.dbId,
+              worldPosition,
+            };
+          }
+        }
       }
 
-      if (dbIdFilterRef.current && !dbIdFilterRef.current(hit.dbId)) {
-        return null;
-      }
-
-      if (hit.point) {
+      const spatialPosition = getSpatialPosition(viewer, x, y);
+      if (spatialPosition) {
         return {
-          dbId: hit.dbId,
-          worldPosition: {
-            x: hit.point.x,
-            y: hit.point.y,
-            z: hit.point.z,
-          },
+          dbId: null,
+          worldPosition: spatialPosition,
         };
       }
 
-      const fallbackWorldPosition = getDbIdWorldPosition(viewer, hit.dbId);
-      if (!fallbackWorldPosition) {
-        return null;
-      }
-
-      return {
-        dbId: hit.dbId,
-        worldPosition: fallbackWorldPosition,
-      };
+      return null;
     },
     [viewer, viewerContainer]
   );
@@ -134,11 +137,35 @@ export function useViewerInteraction({
 
       const selectedDbId = event.dbIdArray?.[0];
       if (!selectedDbId) {
+        const latestPointer = latestPointerRef.current;
+        if (latestPointer) {
+          const spatialHit = performHitTest(
+            latestPointer.clientX,
+            latestPointer.clientY
+          );
+          if (spatialHit && spatialHit.dbId === null) {
+            setSelectedElement(spatialHit);
+            return;
+          }
+        }
+
         setSelectedElement(null);
         return;
       }
 
       if (dbIdFilterRef.current && !dbIdFilterRef.current(selectedDbId)) {
+        const latestPointer = latestPointerRef.current;
+        if (latestPointer) {
+          const spatialHit = performHitTest(
+            latestPointer.clientX,
+            latestPointer.clientY
+          );
+          if (spatialHit && spatialHit.dbId === null) {
+            setSelectedElement(spatialHit);
+            return;
+          }
+        }
+
         setSelectedElement(null);
         return;
       }
@@ -166,6 +193,9 @@ export function useViewerInteraction({
     };
 
     const onDoubleClick = (event: MouseEvent) => {
+      if (isIssueMarkerTarget(event.target)) {
+        return;
+      }
       clearPendingSelection();
       latestPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
 
@@ -182,11 +212,30 @@ export function useViewerInteraction({
       if (event.button !== 0) {
         return;
       }
+      if (isIssueMarkerTarget(event.target)) {
+        return;
+      }
 
-      pointerDownRef.current = { clientX: event.clientX, clientY: event.clientY };
+      const now = Date.now();
+      const isDoubleTap = now - lastTapRef.current < DOUBLE_TAP_THRESHOLD_MS;
+      lastTapRef.current = now;
+
       latestPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
       clearLongPressTimer();
 
+      if (isDoubleTap) {
+        const hit = performHitTest(event.clientX, event.clientY);
+        if (hit) {
+          clearPendingSelection();
+          setSelectedElement(null);
+          onQuickRegisterRef.current?.(hit);
+          pointerDownRef.current = null;
+          lastTapRef.current = 0;
+          return;
+        }
+      }
+
+      pointerDownRef.current = { clientX: event.clientX, clientY: event.clientY };
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
         if (!pointerDownRef.current) {
@@ -208,6 +257,9 @@ export function useViewerInteraction({
     };
 
     const onPointerMove = (event: PointerEvent) => {
+      if (isIssueMarkerTarget(event.target)) {
+        return;
+      }
       latestPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
 
       if (!pointerDownRef.current) {
@@ -221,7 +273,33 @@ export function useViewerInteraction({
       }
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (event: PointerEvent) => {
+      if (isIssueMarkerTarget(event.target)) {
+        pointerDownRef.current = null;
+        clearLongPressTimer();
+        return;
+      }
+      const downPos = pointerDownRef.current;
+      pointerDownRef.current = null;
+      clearLongPressTimer();
+
+      if (!downPos) {
+        return;
+      }
+
+      const dx = event.clientX - downPos.clientX;
+      const dy = event.clientY - downPos.clientY;
+      if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_THRESHOLD_PX) {
+        return;
+      }
+
+      const hit = performHitTest(event.clientX, event.clientY);
+      if (hit && hit.dbId === null) {
+        setSelectedElement(hit);
+      }
+    };
+
+    const onPointerCancel = () => {
       pointerDownRef.current = null;
       clearLongPressTimer();
     };
@@ -235,7 +313,7 @@ export function useViewerInteraction({
     viewerContainer.addEventListener('pointerdown', onPointerDown);
     viewerContainer.addEventListener('pointermove', onPointerMove);
     viewerContainer.addEventListener('pointerup', onPointerUp);
-    viewerContainer.addEventListener('pointercancel', onPointerUp);
+    viewerContainer.addEventListener('pointercancel', onPointerCancel);
     viewerContainer.addEventListener('contextmenu', onContextMenu);
 
     return () => {
@@ -247,7 +325,7 @@ export function useViewerInteraction({
       viewerContainer.removeEventListener('pointerdown', onPointerDown);
       viewerContainer.removeEventListener('pointermove', onPointerMove);
       viewerContainer.removeEventListener('pointerup', onPointerUp);
-      viewerContainer.removeEventListener('pointercancel', onPointerUp);
+      viewerContainer.removeEventListener('pointercancel', onPointerCancel);
       viewerContainer.removeEventListener('contextmenu', onContextMenu);
     };
   }, [
@@ -283,10 +361,12 @@ function getDbIdWorldPosition(
       return null;
     }
 
-    const bbox = fragmentList.getWorldBoundingBox(targetFragmentId);
-    if (!bbox) {
+    const THREE = (window as any).THREE;
+    if (!THREE) {
       return null;
     }
+    const bbox = new THREE.Box3();
+    fragmentList.getWorldBounds(targetFragmentId, bbox);
 
     return {
       x: (bbox.min.x + bbox.max.x) / 2,
@@ -297,4 +377,107 @@ function getDbIdWorldPosition(
     console.warn('[useViewerInteraction] Failed to resolve world position:', error);
     return null;
   }
+}
+
+function getSpatialPosition(
+  viewer: Autodesk.Viewing.GuiViewer3D,
+  canvasX: number,
+  canvasY: number
+): { x: number; y: number; z: number } | null {
+  try {
+    const THREE = (window as any).THREE;
+    if (!THREE) {
+      return getPivotPosition(viewer);
+    }
+
+    const canvas = viewer.impl.canvas as HTMLCanvasElement | null;
+    if (!canvas) {
+      return getPivotPosition(viewer);
+    }
+
+    const width = canvas.clientWidth || canvas.width;
+    const height = canvas.clientHeight || canvas.height;
+    if (!width || !height) {
+      return getPivotPosition(viewer);
+    }
+
+    const modelBox = viewer.model?.getBoundingBox();
+    const pivot = getPivotPosition(viewer);
+    const planePoint = new THREE.Vector3(
+      modelBox ? (modelBox.min.x + modelBox.max.x) / 2 : (pivot?.x ?? 0),
+      modelBox ? (modelBox.min.y + modelBox.max.y) / 2 : (pivot?.y ?? 0),
+      modelBox ? (modelBox.min.z + modelBox.max.z) / 2 : (pivot?.z ?? 0)
+    );
+
+    const worldUpRaw = (viewer as any).navigation?.getWorldUpVector?.();
+    const planeNormal = Array.isArray(worldUpRaw)
+      ? new THREE.Vector3(worldUpRaw[0], worldUpRaw[1], worldUpRaw[2])
+      : worldUpRaw?.clone?.() ?? new THREE.Vector3(0, 1, 0);
+
+    if (planeNormal.lengthSq() === 0) {
+      return getPivotPosition(viewer);
+    }
+
+    planeNormal.normalize();
+
+    const ndcX = (canvasX / width) * 2 - 1;
+    const ndcY = -(canvasY / height) * 2 + 1;
+    const camera = viewer.impl.camera;
+    const origin = camera.position.clone();
+    const direction = new THREE.Vector3(ndcX, ndcY, 0.5)
+      .unproject(camera)
+      .sub(origin)
+      .normalize();
+    const raycaster = new THREE.Raycaster(origin, direction);
+
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      planeNormal,
+      planePoint
+    );
+    const intersection = new THREE.Vector3();
+    const hasIntersection = raycaster.ray.intersectPlane(plane, intersection);
+    if (!hasIntersection) {
+      return getPivotPosition(viewer);
+    }
+
+    return { x: intersection.x, y: intersection.y, z: intersection.z };
+  } catch (error) {
+    console.warn(
+      '[useViewerInteraction] Failed to resolve spatial world position:',
+      error
+    );
+    return getPivotPosition(viewer);
+  }
+}
+
+function getPivotPosition(
+  viewer: Autodesk.Viewing.GuiViewer3D
+): { x: number; y: number; z: number } | null {
+  try {
+    const pivot = (viewer as any).navigation?.getPivotPoint?.();
+    if (pivot) {
+      return { x: pivot.x, y: pivot.y, z: pivot.z };
+    }
+
+    const box = viewer.model?.getBoundingBox();
+    if (!box) {
+      return null;
+    }
+
+    return {
+      x: (box.min.x + box.max.x) / 2,
+      y: (box.min.y + box.max.y) / 2,
+      z: (box.min.z + box.max.z) / 2,
+    };
+  } catch (error) {
+    console.warn('[useViewerInteraction] Failed to resolve pivot position:', error);
+    return null;
+  }
+}
+
+function isIssueMarkerTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return target.closest('[data-issue-id]') !== null;
 }

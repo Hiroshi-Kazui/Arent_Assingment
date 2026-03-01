@@ -46,6 +46,13 @@ export function ElementInfoPanel({
       setProperties([]);
       return;
     }
+    if (element.dbId === null) {
+      setLoading(false);
+      setError(null);
+      setName('');
+      setProperties([]);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);

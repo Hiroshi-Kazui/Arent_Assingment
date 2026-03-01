@@ -29,10 +29,10 @@ async function main() {
 
   console.log(`✓ Building created: ${building.name}`);
 
-  // Floor を作成（1F〜5F）
+  // Floor を作成（1F〜11F）
   const floors = [];
-  for (let i = 1; i <= 5; i++) {
-    const floorId = `33333333-3333-3333-3333-33333333333${i}`;
+  for (let i = 1; i <= 11; i++) {
+    const floorId = `33333333-3333-3333-3333-3333333333${String(i).padStart(2, '0')}`;
     const floor = await prisma.floor.upsert({
       where: { floor_id: floorId },
       update: {},

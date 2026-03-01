@@ -33,7 +33,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Plus, ListIcon } from 'lucide-react';
+import { ListIcon } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -82,6 +82,10 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "o
   OPEN: 'destructive',
   IN_PROGRESS: 'default',
   DONE: 'secondary',
+};
+
+const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
+  DONE: 'bg-[#22c55e] text-white border-transparent hover:bg-[#16a34a]',
 };
 
 const ISSUE_TYPES = ['quality', 'safety', 'construction', 'design'];
@@ -135,8 +139,8 @@ export default function ViewerPage({ params }: PageProps) {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIssueType, setFormIssueType] = useState('quality');
-  const [formPhotoPhase, setFormPhotoPhase] = useState<'BEFORE' | 'AFTER'>('BEFORE');
   const [formFiles, setFormFiles] = useState<FileList | null>(null);
+  const [formFloorId, setFormFloorId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -236,6 +240,19 @@ export default function ViewerPage({ params }: PageProps) {
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
+    if (!selectedFloorId && hit.dbId !== null && floorMappingReady) {
+      const floorNumber = getFloorNumberForDbId(hit.dbId);
+      if (floorNumber !== null) {
+        const matchedFloor = floors.find(
+          (floor) => floor.floorNumber === floorNumber
+        );
+        setFormFloorId(matchedFloor?.floorId ?? '');
+      } else {
+        setFormFloorId('');
+      }
+    } else if (!selectedFloorId) {
+      setFormFloorId('');
+    }
     setShowForm(true);
   };
 
@@ -244,17 +261,39 @@ export default function ViewerPage({ params }: PageProps) {
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
+    if (!selectedFloorId && hit.dbId !== null && floorMappingReady) {
+      const floorNumber = getFloorNumberForDbId(hit.dbId);
+      if (floorNumber !== null) {
+        const matchedFloor = floors.find(
+          (floor) => floor.floorNumber === floorNumber
+        );
+        setFormFloorId(matchedFloor?.floorId ?? '');
+      } else {
+        setFormFloorId('');
+      }
+    } else if (!selectedFloorId) {
+      setFormFloorId('');
+    }
     setShowForm(true);
     clearSelection();
   };
 
   // フォーム送信
   const handleSubmitIssue = async () => {
+    if (selectedDbId === null && selectedWorldPosition === null) {
+      alert('部材または空間を選択してください');
+      return;
+    }
     if (!formTitle.trim() || !formDescription.trim()) {
       alert('タイトルと説明を入力してください');
       return;
     }
-    if (!selectedFloorId) {
+    if (!formFiles || formFiles.length === 0) {
+      alert('施工前写真を添付してください');
+      return;
+    }
+    const effectiveFloorId = selectedFloorId || formFloorId;
+    if (!effectiveFloorId) {
       alert('フロアを選択してください');
       return;
     }
@@ -262,7 +301,7 @@ export default function ViewerPage({ params }: PageProps) {
     try {
       setSubmitting(true);
       const fd = new FormData();
-      fd.append('floorId', selectedFloorId);
+      fd.append('floorId', effectiveFloorId);
       fd.append('title', formTitle);
       fd.append('description', formDescription);
       fd.append('issueType', formIssueType);
@@ -281,7 +320,7 @@ export default function ViewerPage({ params }: PageProps) {
         fd.append('worldPositionZ', String(selectedWorldPosition?.z ?? 0));
       }
       if (formFiles && formFiles.length > 0) {
-        fd.append('photoPhase', formPhotoPhase);
+        fd.append('photoPhase', 'BEFORE');
         for (const file of Array.from(formFiles)) {
           fd.append('files', file);
         }
@@ -301,8 +340,8 @@ export default function ViewerPage({ params }: PageProps) {
       setFormTitle('');
       setFormDescription('');
       setFormIssueType('quality');
-      setFormPhotoPhase('BEFORE');
       setFormFiles(null);
+      setFormFloorId('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setShowForm(false);
       setSelectedDbId(null);
@@ -338,6 +377,7 @@ export default function ViewerPage({ params }: PageProps) {
   const selectedFloorNumber = currentFloor?.floorNumber ?? null;
   const {
     isDbIdOnSelectedFloor,
+    getFloorNumberForDbId,
     floorMappingReady,
     floorMappingError,
     floorsWithElements,
@@ -391,7 +431,10 @@ export default function ViewerPage({ params }: PageProps) {
             >
               <div className="flex items-start justify-between gap-3 mb-2">
                 <p className={`text-sm font-medium transition-colors line-clamp-2 pr-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
-                <Badge variant={STATUS_COLORS[issue.status] ?? 'outline'} className="shrink-0 text-[10px] whitespace-nowrap">
+                <Badge
+                  variant={STATUS_COLORS[issue.status] ?? 'outline'}
+                  className={`shrink-0 w-[64px] justify-center text-center text-[10px] whitespace-nowrap ${STATUS_BADGE_CLASSNAMES[issue.status] ?? ''}`}
+                >
                   {STATUS_LABELS[issue.status]}
                 </Badge>
               </div>
@@ -431,16 +474,6 @@ export default function ViewerPage({ params }: PageProps) {
           <span className="text-foreground/80">{project?.name ?? id}</span>
         </div>
 
-        <Button
-          onClick={() => {
-            setSelectedDbId(null);
-            setSelectedWorldPosition(null);
-            setShowForm(true);
-          }}
-          className="sm:ml-auto shrink-0 font-medium hidden sm:flex"
-        >
-          + 新規指摘
-        </Button>
       </header>
 
       {/* Main content */}
@@ -516,7 +549,7 @@ export default function ViewerPage({ params }: PageProps) {
             />
           )}
 
-          {viewer && selectedElement && (
+          {viewer && selectedElement && selectedElement.dbId !== null && (
             <ElementInfoPanel
               viewer={viewer}
               element={selectedElement}
@@ -569,17 +602,6 @@ export default function ViewerPage({ params }: PageProps) {
         </Drawer>
       </div>
 
-      {/* Mobile FAB */}
-      <Button
-        className="sm:hidden fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg z-40 flex items-center justify-center p-0"
-        onClick={() => {
-          setSelectedDbId(null);
-          setSelectedWorldPosition(null);
-          setShowForm(true);
-        }}
-      >
-        <Plus className="w-7 h-7" />
-      </Button>
 
       {/* Issue registration modal */}
       <Dialog
@@ -592,6 +614,7 @@ export default function ViewerPage({ params }: PageProps) {
           if (!open) {
             setSelectedDbId(null);
             setSelectedWorldPosition(null);
+            setFormFloorId('');
           }
         }}
       >
@@ -602,6 +625,30 @@ export default function ViewerPage({ params }: PageProps) {
 
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-5 px-1">
+              {!selectedFloorId && floors.length > 0 && (
+                <div>
+                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                    フロア <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formFloorId}
+                    onValueChange={setFormFloorId}
+                    disabled={submitting}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="フロアを選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {floors.map((f) => (
+                        <SelectItem key={f.floorId} value={f.floorId}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
                   指摘タイトル <span className="text-destructive">*</span>
@@ -652,24 +699,13 @@ export default function ViewerPage({ params }: PageProps) {
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">写真</label>
-                <Select
-                  value={formPhotoPhase}
-                  onValueChange={(value) => setFormPhotoPhase(value as 'BEFORE' | 'AFTER')}
-                  disabled={submitting}
-                >
-                  <SelectTrigger className="w-full mb-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BEFORE">是正前</SelectItem>
-                    <SelectItem value="AFTER">是正後</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  施工前写真 <span className="text-destructive">*</span>
+                </label>
                 <div className="border rounded-md p-2 focus-within:ring-1 focus-within:ring-ring bg-background">
                   <Input
                     type="file"
-                    accept="image/*"
+                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                     multiple
                     ref={fileInputRef}
                     onChange={(e) => setFormFiles(e.target.files)}
@@ -688,6 +724,7 @@ export default function ViewerPage({ params }: PageProps) {
                 setShowForm(false);
                 setSelectedDbId(null);
                 setSelectedWorldPosition(null);
+                setFormFloorId('');
               }}
               disabled={submitting}
             >

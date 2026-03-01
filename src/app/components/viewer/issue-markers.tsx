@@ -135,8 +135,21 @@ export function IssueMarkers({
         if (onMarkerHover) onMarkerHover(null);
       });
 
+      // Viewer 側のダブルクリック/長押し登録ハンドラへ伝播させない
+      markerDiv.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+      });
+      markerDiv.addEventListener('pointerup', (event) => {
+        event.stopPropagation();
+      });
+      markerDiv.addEventListener('dblclick', (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+      });
+
       // クリック
-      markerDiv.addEventListener('click', () => {
+      markerDiv.addEventListener('click', (event) => {
+        event.stopPropagation();
         if (onMarkerClick) onMarkerClick(marker.issueId);
       });
 
@@ -193,7 +206,8 @@ function updateMarkerPosition(
         });
 
         if (fragmentId >= 0) {
-          const bbox = fragmentList.getWorldBoundingBox(fragmentId);
+          const bbox = new THREE.Box3();
+          fragmentList.getWorldBounds(fragmentId, bbox);
           if (bbox) {
             const cx = (bbox.min.x + bbox.max.x) / 2;
             const cy = (bbox.min.y + bbox.max.y) / 2;

@@ -15,6 +15,7 @@ interface UseFloorIsolationParams {
 
 interface UseFloorIsolationResult {
   isDbIdOnSelectedFloor: (dbId: number) => boolean;
+  getFloorNumberForDbId: (dbId: number) => number | null;
   floorMappingReady: boolean;
   floorMappingError: string | null;
   floorsWithElements: Set<number>;
@@ -180,6 +181,7 @@ export function useFloorIsolation({
     }
 
     console.log(`[FloorIsolation] フロア ${selectedFloorNumber}: ${dbIds.size} 個の要素を表示します。`);
+
     isolateWithGhosting(viewer, Array.from(dbIds), true);
   }, [viewer, selectedFloorNumber, floorMappingReady]);
 
@@ -203,8 +205,18 @@ export function useFloorIsolation({
     [selectedFloorNumber, floorMappingReady]
   );
 
+  const getFloorNumberForDbId = useCallback((dbId: number): number | null => {
+    for (const [floorNumber, dbIds] of floorDbIdsRef.current.entries()) {
+      if (dbIds.has(dbId)) {
+        return floorNumber;
+      }
+    }
+    return null;
+  }, []);
+
   return {
     isDbIdOnSelectedFloor,
+    getFloorNumberForDbId,
     floorMappingReady,
     floorMappingError,
     floorsWithElements,

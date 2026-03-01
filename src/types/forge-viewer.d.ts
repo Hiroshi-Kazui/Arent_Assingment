@@ -111,6 +111,7 @@ declare global {
       interface FragmentList {
         getCount(): number;
         getWorldBoundingBox(fragmentId: number): any;
+        getWorldBounds(fragmentId: number, bounds: any): any;
         getWorldMatrix(fragmentId: number): any;
       }
 

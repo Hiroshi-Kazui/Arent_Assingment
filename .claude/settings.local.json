@@ -50,7 +50,11 @@
       "Bash(npx next build)",
       "Bash(npm install -D @tailwindcss/postcss)",
       "Bash(git push)",
-      "Bash(xargs grep -l \"input type.*file\\\\|photoPhase\\\\|FormData\")"
+      "Bash(xargs grep -l \"input type.*file\\\\|photoPhase\\\\|FormData\")",
+      "Bash(xargs grep -l \"floor\")",
+      "Bash(npx prisma migrate reset --force)",
+      "Bash(npx tsc --noEmit --pretty)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

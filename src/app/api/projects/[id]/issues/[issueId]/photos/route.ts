@@ -7,6 +7,16 @@ interface Params {
   issueId: string;
 }
 
+const ALLOWED_PHOTO_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
+function getFileExtension(fileName: string): string {
+  const parts = fileName.split('.');
+  if (parts.length <= 1) {
+    return '';
+  }
+  return parts[parts.length - 1].toLowerCase();
+}
+
 /**
  * POST /api/projects/[id]/issues/[issueId]/photos
  * Photo をアップロード
@@ -48,6 +58,17 @@ export async function POST(
       );
     }
 
+    const ext = getFileExtension(file.name);
+    if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp',
+        },
+        { status: 400 }
+      );
+    }
+
     // File を Buffer に変換
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -65,7 +86,7 @@ export async function POST(
       {
         photoId,
         blobKey: `projects/${id}/issues/${issueId}/photos/${photoId}.${
-          file.name.split('.').pop() || 'bin'
+          ext || 'bin'
         }`,
       },
       201

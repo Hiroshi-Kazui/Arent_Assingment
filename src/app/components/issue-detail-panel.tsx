@@ -391,7 +391,7 @@ export function IssueDetailPanel({
             <p className="text-xs font-semibold text-muted-foreground mb-2">指摘時写真（是正前）</p>
             <Input
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               ref={beforeFileInputRef}
               onChange={(e) => setBeforeUploadFile(e.target.files?.[0] ?? null)}
               disabled={uploading}
@@ -410,7 +410,7 @@ export function IssueDetailPanel({
             <p className="text-xs font-semibold text-muted-foreground mb-2">完了時写真（是正後）</p>
             <Input
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               ref={afterFileInputRef}
               onChange={(e) => setAfterUploadFile(e.target.files?.[0] ?? null)}
               disabled={uploading}
