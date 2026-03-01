@@ -7,7 +7,10 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
 } from '@/components/ui/carousel';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -77,6 +80,11 @@ const TRANSITION_COLORS: Record<string, 'default' | 'secondary' | 'destructive' 
   DONE: 'secondary',
 };
 
+const CAROUSEL_LAYOUT_CLASS = 'w-full px-10 sm:px-11';
+const CAROUSEL_ITEM_CLASS = 'pl-2 basis-3/4 sm:basis-2/5 md:basis-1/4';
+const CAROUSEL_NAV_CLASS = 'z-10 h-9 w-9 bg-background/90 backdrop-blur-sm hover:bg-background';
+const CAROUSEL_OPTS = { align: 'start' as const, loop: true, slidesToScroll: 1 };
+
 async function fetchIssue(projectId: string, issueId: string): Promise<IssueDetail> {
   const issueRes = await fetch(`/api/projects/${projectId}/issues/${issueId}`);
   if (!issueRes.ok) {
@@ -112,9 +120,10 @@ export function IssueDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
-  const [beforeUploadFile, setBeforeUploadFile] = useState<File | null>(null);
-  const [afterUploadFile, setAfterUploadFile] = useState<File | null>(null);
+  const [beforeUploadFiles, setBeforeUploadFiles] = useState<File[]>([]);
+  const [afterUploadFiles, setAfterUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const beforeFileInputRef = useRef<HTMLInputElement>(null);
   const afterFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,8 +136,8 @@ export function IssueDetailPanel({
         setPhotoUrls({});
         setError(null);
         setLoading(false);
-        setBeforeUploadFile(null);
-        setAfterUploadFile(null);
+        setBeforeUploadFiles([]);
+        setAfterUploadFiles([]);
         return;
       }
 
@@ -198,8 +207,8 @@ export function IssueDetailPanel({
     }
   };
 
-  const handlePhotoUpload = async (phase: 'BEFORE' | 'AFTER', file: File | null) => {
-    if (!file) {
+  const handlePhotoUpload = async (phase: 'BEFORE' | 'AFTER', files: File[]) => {
+    if (files.length === 0) {
       alert('ファイルを選択してください');
       return;
     }
@@ -207,7 +216,9 @@ export function IssueDetailPanel({
     try {
       setUploading(true);
       const fd = new FormData();
-      fd.append('file', file);
+      for (const file of files) {
+        fd.append('files', file);
+      }
       fd.append('photoPhase', phase);
 
       const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/photos`, {
@@ -221,10 +232,10 @@ export function IssueDetailPanel({
       }
 
       if (phase === 'BEFORE') {
-        setBeforeUploadFile(null);
+        setBeforeUploadFiles([]);
         if (beforeFileInputRef.current) beforeFileInputRef.current.value = '';
       } else {
-        setAfterUploadFile(null);
+        setAfterUploadFiles([]);
         if (afterFileInputRef.current) afterFileInputRef.current.value = '';
       }
 
@@ -239,6 +250,8 @@ export function IssueDetailPanel({
 
   const beforePhotos = issue?.photos.filter((p) => p.photoPhase === 'BEFORE') ?? [];
   const afterPhotos = issue?.photos.filter((p) => p.photoPhase === 'AFTER') ?? [];
+  const showBeforeNavigation = beforePhotos.length >= 4;
+  const showAfterNavigation = afterPhotos.length >= 4;
   const transitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
 
   if (loading) {
@@ -353,14 +366,29 @@ export function IssueDetailPanel({
         {beforePhotos.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-2">是正前</p>
-            <Carousel className="w-full">
+            <Carousel className={CAROUSEL_LAYOUT_CLASS} opts={CAROUSEL_OPTS}>
               <CarouselContent className="-ml-2">
                 {beforePhotos.map((photo) => (
-                  <CarouselItem key={photo.photoId} className="pl-2 basis-4/5 sm:basis-1/2 md:basis-1/3">
-                    <PhotoCard photo={photo} url={photoUrls[photo.photoId]} />
+                  <CarouselItem key={photo.photoId} className={CAROUSEL_ITEM_CLASS}>
+                    <PhotoCard
+                      photo={photo}
+                      url={photoUrls[photo.photoId]}
+                      onClick={() => {
+                        const selectedUrl = photoUrls[photo.photoId];
+                        if (selectedUrl) {
+                          setLightboxUrl(selectedUrl);
+                        }
+                      }}
+                    />
                   </CarouselItem>
                 ))}
               </CarouselContent>
+              {showBeforeNavigation && (
+                <>
+                  <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
+                  <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
+                </>
+              )}
             </Carousel>
           </div>
         )}
@@ -368,14 +396,29 @@ export function IssueDetailPanel({
         {afterPhotos.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-2">是正後</p>
-            <Carousel className="w-full">
+            <Carousel className={CAROUSEL_LAYOUT_CLASS} opts={CAROUSEL_OPTS}>
               <CarouselContent className="-ml-2">
                 {afterPhotos.map((photo) => (
-                  <CarouselItem key={photo.photoId} className="pl-2 basis-4/5 sm:basis-1/2 md:basis-1/3">
-                    <PhotoCard photo={photo} url={photoUrls[photo.photoId]} />
+                  <CarouselItem key={photo.photoId} className={CAROUSEL_ITEM_CLASS}>
+                    <PhotoCard
+                      photo={photo}
+                      url={photoUrls[photo.photoId]}
+                      onClick={() => {
+                        const selectedUrl = photoUrls[photo.photoId];
+                        if (selectedUrl) {
+                          setLightboxUrl(selectedUrl);
+                        }
+                      }}
+                    />
                   </CarouselItem>
                 ))}
               </CarouselContent>
+              {showAfterNavigation && (
+                <>
+                  <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
+                  <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
+                </>
+              )}
             </Carousel>
           </div>
         )}
@@ -392,14 +435,22 @@ export function IssueDetailPanel({
             <Input
               type="file"
               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              multiple
               ref={beforeFileInputRef}
-              onChange={(e) => setBeforeUploadFile(e.target.files?.[0] ?? null)}
+              onChange={(e) =>
+                setBeforeUploadFiles(Array.from(e.target.files ?? []))
+              }
               disabled={uploading}
               className="mb-2"
             />
+            {beforeUploadFiles.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mb-2">
+                {beforeUploadFiles.length}枚選択中
+              </p>
+            )}
             <Button
-              onClick={() => handlePhotoUpload('BEFORE', beforeUploadFile)}
-              disabled={uploading || !beforeUploadFile}
+              onClick={() => handlePhotoUpload('BEFORE', beforeUploadFiles)}
+              disabled={uploading || beforeUploadFiles.length === 0}
               className="w-full"
             >
               {uploading ? '送信中...' : '是正前をアップロード'}
@@ -411,14 +462,22 @@ export function IssueDetailPanel({
             <Input
               type="file"
               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              multiple
               ref={afterFileInputRef}
-              onChange={(e) => setAfterUploadFile(e.target.files?.[0] ?? null)}
+              onChange={(e) =>
+                setAfterUploadFiles(Array.from(e.target.files ?? []))
+              }
               disabled={uploading}
               className="mb-2"
             />
+            {afterUploadFiles.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mb-2">
+                {afterUploadFiles.length}枚選択中
+              </p>
+            )}
             <Button
-              onClick={() => handlePhotoUpload('AFTER', afterUploadFile)}
-              disabled={uploading || !afterUploadFile}
+              onClick={() => handlePhotoUpload('AFTER', afterUploadFiles)}
+              disabled={uploading || afterUploadFiles.length === 0}
               className="w-full"
             >
               {uploading ? '送信中...' : '是正後をアップロード'}
@@ -426,13 +485,45 @@ export function IssueDetailPanel({
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={lightboxUrl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLightboxUrl(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl p-2 bg-black/90 border-none">
+          {lightboxUrl && (
+            <img
+              src={lightboxUrl}
+              alt="拡大写真"
+              className="w-full h-auto max-h-[80vh] object-contain rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PhotoCard({ photo, url }: { photo: Photo; url?: string }) {
+function PhotoCard({
+  photo,
+  url,
+  onClick,
+}: {
+  photo: Photo;
+  url?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="aspect-square w-full rounded-md border overflow-hidden bg-muted/20 flex items-center justify-center relative group">
+    <div
+      onClick={url ? onClick : undefined}
+      className={`aspect-square w-full rounded-md border overflow-hidden bg-muted/20 flex items-center justify-center relative group ${
+        url && onClick ? 'cursor-pointer' : ''
+      }`}
+    >
       {url ? (
         <>
           <img src={url} alt={`Photo ${photo.photoId}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />

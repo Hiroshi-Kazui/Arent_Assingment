@@ -235,24 +235,28 @@ export default function ViewerPage({ params }: PageProps) {
     openDetailModal(issueId);
   };
 
+  const resolveFloorId = (dbId: number | null): string => {
+    if (dbId !== null && floorMappingReady) {
+      const floorNumber = getFloorNumberForDbId(dbId);
+      if (floorNumber !== null) {
+        const matchedFloor = floors.find(
+          (floor) => floor.floorNumber === floorNumber
+        );
+        if (matchedFloor) {
+          return matchedFloor.floorId;
+        }
+      }
+    }
+
+    return selectedFloorId ?? '';
+  };
+
   // 導線A: ダブルクリック/長押しで即時登録
   const handleQuickRegister = (hit: ViewerHit) => {
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
-    if (!selectedFloorId && hit.dbId !== null && floorMappingReady) {
-      const floorNumber = getFloorNumberForDbId(hit.dbId);
-      if (floorNumber !== null) {
-        const matchedFloor = floors.find(
-          (floor) => floor.floorNumber === floorNumber
-        );
-        setFormFloorId(matchedFloor?.floorId ?? '');
-      } else {
-        setFormFloorId('');
-      }
-    } else if (!selectedFloorId) {
-      setFormFloorId('');
-    }
+    setFormFloorId(resolveFloorId(hit.dbId));
     setShowForm(true);
   };
 
@@ -261,19 +265,7 @@ export default function ViewerPage({ params }: PageProps) {
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
-    if (!selectedFloorId && hit.dbId !== null && floorMappingReady) {
-      const floorNumber = getFloorNumberForDbId(hit.dbId);
-      if (floorNumber !== null) {
-        const matchedFloor = floors.find(
-          (floor) => floor.floorNumber === floorNumber
-        );
-        setFormFloorId(matchedFloor?.floorId ?? '');
-      } else {
-        setFormFloorId('');
-      }
-    } else if (!selectedFloorId) {
-      setFormFloorId('');
-    }
+    setFormFloorId(resolveFloorId(hit.dbId));
     setShowForm(true);
     clearSelection();
   };
@@ -292,8 +284,7 @@ export default function ViewerPage({ params }: PageProps) {
       alert('施工前写真を添付してください');
       return;
     }
-    const effectiveFloorId = selectedFloorId || formFloorId;
-    if (!effectiveFloorId) {
+    if (!formFloorId) {
       alert('フロアを選択してください');
       return;
     }
@@ -301,7 +292,7 @@ export default function ViewerPage({ params }: PageProps) {
     try {
       setSubmitting(true);
       const fd = new FormData();
-      fd.append('floorId', effectiveFloorId);
+      fd.append('floorId', formFloorId);
       fd.append('title', formTitle);
       fd.append('description', formDescription);
       fd.append('issueType', formIssueType);
@@ -625,7 +616,7 @@ export default function ViewerPage({ params }: PageProps) {
 
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-5 px-1">
-              {!selectedFloorId && floors.length > 0 && (
+              {floors.length > 0 && (
                 <div>
                   <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
                     フロア <span className="text-destructive">*</span>

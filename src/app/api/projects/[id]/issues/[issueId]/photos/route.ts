@@ -20,7 +20,7 @@ function getFileExtension(fileName: string): string {
 /**
  * POST /api/projects/[id]/issues/[issueId]/photos
  * Photo をアップロード
- * multipart/form-data で file と photoPhase を受け取る
+ * multipart/form-data で files[] (or file) と photoPhase を受け取る
  */
 export async function POST(
   request: Request,
@@ -31,13 +31,16 @@ export async function POST(
     const formData = await request.formData();
 
     // ファイルと photoPhase を取得
-    const file = formData.get('file') as File;
+    const files = [
+      ...formData.getAll('files').filter((v): v is File => v instanceof File),
+      ...formData.getAll('file').filter((v): v is File => v instanceof File),
+    ];
     const photoPhase = formData.get('photoPhase') as string;
 
     // リクエストバリデーション
-    if (!file) {
+    if (files.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required field: file' },
+        { error: 'Missing required field: files' },
         { status: 400 }
       );
     }
@@ -58,36 +61,46 @@ export async function POST(
       );
     }
 
-    const ext = getFileExtension(file.name);
-    if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
-      return NextResponse.json(
-        {
-          error:
-            'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp',
-        },
-        { status: 400 }
-      );
-    }
-
-    // File を Buffer に変換
-    const buffer = Buffer.from(await file.arrayBuffer());
-
     const handlers = getCommandHandlers();
-    const photoId = await handlers.addPhoto.execute({
-      issueId,
-      projectId: id,
-      file: buffer,
-      fileName: file.name,
-      contentType: file.type,
-      photoPhase: photoPhase as 'BEFORE' | 'AFTER',
-    });
+    const uploadedPhotos: Array<{ photoId: string; blobKey: string }> = [];
 
-    return successResponse(
-      {
+    for (const file of files) {
+      const ext = getFileExtension(file.name);
+      if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp',
+          },
+          { status: 400 }
+        );
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const photoId = await handlers.addPhoto.execute({
+        issueId,
+        projectId: id,
+        file: buffer,
+        fileName: file.name,
+        contentType: file.type,
+        photoPhase: photoPhase as 'BEFORE' | 'AFTER',
+      });
+
+      uploadedPhotos.push({
         photoId,
         blobKey: `projects/${id}/issues/${issueId}/photos/${photoId}.${
           ext || 'bin'
         }`,
+      });
+    }
+
+    return successResponse(
+      {
+        photoId: uploadedPhotos[0]?.photoId ?? null,
+        blobKey: uploadedPhotos[0]?.blobKey ?? null,
+        photoIds: uploadedPhotos.map((p) => p.photoId),
+        photos: uploadedPhotos,
+        uploadedCount: uploadedPhotos.length,
       },
       201
     );
