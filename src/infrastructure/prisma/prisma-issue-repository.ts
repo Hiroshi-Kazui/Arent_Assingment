@@ -34,6 +34,7 @@ export class PrismaIssueRepository implements IIssueRepository {
         reported_by: issue.reportedBy,
         priority: issue.priority,
         status: issue.status,
+        due_date: issue.dueDate,
         location_type: location.type,
         db_id: dbId ? parseInt(dbId, 10) : null,
         world_position_x: x !== undefined ? String(x) : null,
@@ -51,6 +52,7 @@ export class PrismaIssueRepository implements IIssueRepository {
         reported_by: issue.reportedBy,
         priority: issue.priority,
         status: issue.status,
+        due_date: issue.dueDate,
         location_type: location.type,
         db_id: dbId ? parseInt(dbId, 10) : null,
         world_position_x: x !== undefined ? String(x) : null,
@@ -132,6 +134,7 @@ export class PrismaIssueRepository implements IIssueRepository {
       location,
       record.priority as IssuePriority,
       record.status as IssueStatus,
+      record.due_date,
       record.created_at,
       record.updated_at
     );

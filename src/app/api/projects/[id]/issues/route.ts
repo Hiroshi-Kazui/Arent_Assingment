@@ -63,6 +63,7 @@ export async function POST(
     let title = '';
     let description = '';
     let issueType: string | undefined;
+    let dueDate = '';
     let locationType = '';
     let dbId: string | undefined;
     let worldPositionX: number | undefined;
@@ -77,6 +78,7 @@ export async function POST(
       title = String(formData.get('title') || '');
       description = String(formData.get('description') || '');
       issueType = String(formData.get('issueType') || '') || undefined;
+      dueDate = String(formData.get('dueDate') || '');
       locationType = String(formData.get('locationType') || '');
       dbId = String(formData.get('dbId') || '') || undefined;
       const worldXRaw = formData.get('worldPositionX');
@@ -97,6 +99,7 @@ export async function POST(
       title = String(body.title || '');
       description = String(body.description || '');
       issueType = body.issueType ? String(body.issueType) : undefined;
+      dueDate = String(body.dueDate || '');
       locationType = String(body.locationType || '');
       dbId = body.dbId ? String(body.dbId) : undefined;
       worldPositionX = body.worldPositionX !== undefined ? Number(body.worldPositionX) : undefined;
@@ -112,10 +115,10 @@ export async function POST(
     }
 
     // リクエストバリデーション
-    if (!floorId || !title || !description) {
+    if (!floorId || !title || !description || !dueDate) {
       return NextResponse.json(
         {
-          error: 'Missing required fields: floorId, title, description',
+          error: 'Missing required fields: floorId, title, description, dueDate',
         },
         { status: 400 }
       );
@@ -192,6 +195,7 @@ export async function POST(
       title,
       description,
       issueType,
+      dueDate,
       locationType: locationType as 'dbId' | 'worldPosition',
       dbId,
       worldPositionX,

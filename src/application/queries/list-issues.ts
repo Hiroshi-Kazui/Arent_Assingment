@@ -18,13 +18,14 @@ export async function listIssues(
 
   const issues = await prisma.issue.findMany({
     where,
-    orderBy: { created_at: 'desc' },
+    orderBy: { due_date: 'asc' },
   });
 
   return issues.map((issue) => ({
     issueId: issue.issue_id,
     title: issue.title,
     issueType: issue.issue_type ?? undefined,
+    dueDate: issue.due_date.toISOString(),
     status: issue.status as 'OPEN' | 'IN_PROGRESS' | 'DONE',
     priority: issue.priority,
     locationType: issue.location_type as 'dbId' | 'worldPosition',

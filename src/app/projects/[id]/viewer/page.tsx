@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { format } from 'date-fns';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
 import { IssueDetailModal } from '@/app/components/issue-detail-modal';
 import { IssueMarkers, IssueMarker } from '@/app/components/viewer/issue-markers';
@@ -18,6 +19,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -33,7 +36,8 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { ListIcon } from 'lucide-react';
+import { CalendarIcon, ListIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -43,6 +47,7 @@ interface Issue {
   issueId: string;
   title: string;
   issueType?: string;
+  dueDate: string;
   status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
@@ -50,7 +55,6 @@ interface Issue {
   worldPositionY?: number;
   worldPositionZ?: number;
   reportedBy: number;
-  createdAt: string;
 }
 
 interface Project {
@@ -139,6 +143,8 @@ export default function ViewerPage({ params }: PageProps) {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIssueType, setFormIssueType] = useState('quality');
+  const [formDueDate, setFormDueDate] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [formFiles, setFormFiles] = useState<FileList | null>(null);
   const [formFloorId, setFormFloorId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -280,6 +286,10 @@ export default function ViewerPage({ params }: PageProps) {
       alert('タイトルと説明を入力してください');
       return;
     }
+    if (formDueDate === undefined) {
+      alert('是正期限を入力してください');
+      return;
+    }
     if (!formFiles || formFiles.length === 0) {
       alert('施工前写真を添付してください');
       return;
@@ -296,6 +306,7 @@ export default function ViewerPage({ params }: PageProps) {
       fd.append('title', formTitle);
       fd.append('description', formDescription);
       fd.append('issueType', formIssueType);
+      fd.append('dueDate', format(formDueDate, 'yyyy-MM-dd'));
       if (selectedDbId !== null) {
         fd.append('locationType', 'dbId');
         fd.append('dbId', String(selectedDbId));
@@ -331,6 +342,7 @@ export default function ViewerPage({ params }: PageProps) {
       setFormTitle('');
       setFormDescription('');
       setFormIssueType('quality');
+      setFormDueDate(undefined);
       setFormFiles(null);
       setFormFloorId('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -411,7 +423,15 @@ export default function ViewerPage({ params }: PageProps) {
         </div>
       ) : (
         <div className="flex flex-col">
-          {issues.map((issue) => (
+          {issues.map((issue) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const issueDueDate = new Date(issue.dueDate);
+            issueDueDate.setHours(0, 0, 0, 0);
+            const isOverdue =
+              issue.status !== 'DONE' && issueDueDate.getTime() <= today.getTime();
+
+            return (
             <button
               key={issue.issueId}
               className={`w-full text-left p-4 border-b hover:bg-muted/50 transition-colors group min-h-[64px] ${hoveredIssueId === issue.issueId ? 'bg-muted border-l-4 border-l-primary pl-3' : 'border-l-4 border-l-transparent'
@@ -433,10 +453,12 @@ export default function ViewerPage({ params }: PageProps) {
                 {issue.issueType && (
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">{ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}</Badge>
                 )}
-                <span>{new Date(issue.createdAt).toLocaleDateString('ja-JP')}</span>
+                <span className={isOverdue ? 'text-destructive font-bold' : ''}>
+                  {new Date(issue.dueDate).toLocaleDateString('ja-JP')}
+                </span>
               </div>
             </button>
-          ))}
+          )})}
         </div>
       )}
     </ScrollArea>
@@ -687,6 +709,37 @@ export default function ViewerPage({ params }: PageProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                  是正期限 <span className="text-destructive">*</span>
+                </label>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={submitting}
+                      className={cn(
+                        'w-full justify-start text-left font-normal',
+                        !formDueDate && 'text-muted-foreground'
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formDueDate ? format(formDueDate, 'yyyy/MM/dd') : '日付を選択'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formDueDate}
+                      onSelect={(date) => {
+                        setFormDueDate(date);
+                        setCalendarOpen(false);
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>

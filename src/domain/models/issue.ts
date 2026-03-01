@@ -55,6 +55,7 @@ export class Issue {
     readonly location: Location,
     readonly priority: IssuePriority,
     readonly status: IssueStatus,
+    readonly dueDate: Date,
     readonly createdAt: Date,
     readonly updatedAt: Date
   ) {}
@@ -71,6 +72,7 @@ export class Issue {
     issueType: string | undefined,
     reportedBy: number,
     location: Location,
+    dueDate: Date,
     priority: IssuePriority = IssuePriority.Medium
   ): Issue {
     if (!title || title.trim().length === 0) {
@@ -79,6 +81,9 @@ export class Issue {
 
     if (!description || description.trim().length === 0) {
       throw new Error('Issue description must not be empty');
+    }
+    if (Number.isNaN(dueDate.getTime())) {
+      throw new Error('Issue dueDate is invalid');
     }
 
     const now = new Date();
@@ -93,6 +98,7 @@ export class Issue {
       location,
       priority,
       IssueStatus.Open,
+      dueDate,
       now,
       now
     );
@@ -112,6 +118,7 @@ export class Issue {
     location: Location,
     priority: IssuePriority,
     status: IssueStatus,
+    dueDate: Date,
     createdAt: Date,
     updatedAt: Date
   ): Issue {
@@ -126,6 +133,7 @@ export class Issue {
       location,
       priority,
       status,
+      dueDate,
       createdAt,
       updatedAt
     );
@@ -153,6 +161,7 @@ export class Issue {
       this.location,
       this.priority,
       IssueStatus.InProgress,
+      this.dueDate,
       this.createdAt,
       new Date()
     );
@@ -177,6 +186,7 @@ export class Issue {
       this.location,
       this.priority,
       IssueStatus.Done,
+      this.dueDate,
       this.createdAt,
       new Date()
     );
@@ -201,6 +211,7 @@ export class Issue {
       this.location,
       this.priority,
       IssueStatus.Open,
+      this.dueDate,
       this.createdAt,
       new Date()
     );
@@ -228,6 +239,7 @@ export class Issue {
       this.location,
       this.priority,
       IssueStatus.InProgress,
+      this.dueDate,
       this.createdAt,
       new Date()
     );
@@ -274,6 +286,7 @@ export class Issue {
       this.location,
       newPriority,
       this.status,
+      this.dueDate,
       this.createdAt,
       new Date()
     );

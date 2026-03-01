@@ -69,6 +69,7 @@ describe('Issue Commands - 統合テスト', () => {
       title: 'テスト指摘',
       description: 'テスト用の指摘です',
       issueType: 'structural',
+      dueDate: '2026-12-31',
       locationType: 'worldPosition',
       worldPositionX: 10.5,
       worldPositionY: 20.5,

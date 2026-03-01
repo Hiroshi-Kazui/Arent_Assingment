@@ -9,6 +9,7 @@ export interface CreateIssueInput {
   title: string;
   description: string;
   issueType?: string;
+  dueDate: string;
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
   worldPositionX?: number;
@@ -32,6 +33,7 @@ export interface IssueListItemDto {
   issueId: string;
   title: string;
   issueType?: string;
+  dueDate: string;
   status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
   priority: string;
   locationType: 'dbId' | 'worldPosition';

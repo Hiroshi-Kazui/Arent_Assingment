@@ -42,6 +42,15 @@ export class CreateIssueHandler {
     }
 
     // Issue 集約を生成
+    if (!input.dueDate) {
+      throw new Error('dueDate is required');
+    }
+
+    const dueDate = new Date(input.dueDate);
+    if (Number.isNaN(dueDate.getTime())) {
+      throw new Error('Invalid dueDate');
+    }
+
     const issue = Issue.create(
       issueId,
       projectId,
@@ -50,7 +59,9 @@ export class CreateIssueHandler {
       input.description,
       input.issueType,
       1,
-      location
+      location,
+      dueDate,
+      IssuePriority.Medium
     );
 
     // Issue を永続化

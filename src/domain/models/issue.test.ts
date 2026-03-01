@@ -29,7 +29,8 @@ describe('Issue - 状態遷移ロジック', () => {
         'Description',
         'quality',
         1,
-        location
+        location,
+        new Date()
       );
     }
 
@@ -45,6 +46,7 @@ describe('Issue - 状態遷移ロジック', () => {
       location,
       IssuePriority.Medium,
       status,
+      new Date(),
       new Date(),
       new Date()
     );
@@ -153,7 +155,8 @@ describe('Issue - 状態遷移ロジック', () => {
         description,
         'quality',
         1,
-        location
+        location,
+        new Date()
       );
 
       const inProgress = issue.startWork();

@@ -66,6 +66,7 @@ model Issue {
   description        String
   issue_type         String?
   status             String
+  due_date           DateTime
   location_type      String
   db_id              Int?
   world_position_x   Decimal? @db.Decimal(10, 2)

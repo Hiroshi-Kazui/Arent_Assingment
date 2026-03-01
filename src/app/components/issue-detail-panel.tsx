@@ -10,7 +10,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -27,6 +27,7 @@ interface IssueDetail {
   title: string;
   description: string;
   issueType?: string;
+  dueDate: string;
   status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
   priority: string;
   locationType: 'dbId' | 'worldPosition';
@@ -253,6 +254,11 @@ export function IssueDetailPanel({
   const showBeforeNavigation = beforePhotos.length >= 4;
   const showAfterNavigation = afterPhotos.length >= 4;
   const transitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
+  const isOverdue = issue
+    ? issue.status !== 'DONE' &&
+      new Date(issue.dueDate).setHours(0, 0, 0, 0) <=
+        new Date().setHours(0, 0, 0, 0)
+    : false;
 
   if (loading) {
     return (
@@ -296,8 +302,10 @@ export function IssueDetailPanel({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-muted-foreground text-xs">作成日時</p>
-            <p>{new Date(issue.createdAt).toLocaleString('ja-JP')}</p>
+            <p className="text-muted-foreground text-xs">是正期限</p>
+            <p className={isOverdue ? 'text-destructive font-bold' : ''}>
+              {new Date(issue.dueDate).toLocaleDateString('ja-JP')}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">位置種別</p>
@@ -495,6 +503,7 @@ export function IssueDetailPanel({
         }}
       >
         <DialogContent className="sm:max-w-3xl p-2 bg-black/90 border-none">
+          <DialogTitle className="sr-only">拡大写真</DialogTitle>
           {lightboxUrl && (
             <img
               src={lightboxUrl}

@@ -28,6 +28,7 @@ export async function getIssueDetail(
     title: issue.title,
     description: issue.description,
     issueType: issue.issue_type ?? undefined,
+    dueDate: issue.due_date.toISOString(),
     status: issue.status as 'OPEN' | 'IN_PROGRESS' | 'DONE',
     priority: issue.priority,
     locationType: issue.location_type as 'dbId' | 'worldPosition',
