@@ -1,4 +1,5 @@
 import './globals.css';
+import { SessionProvider } from './components/session-provider';
 
 export const metadata = {
   title: 'Issue Management Tool',
@@ -13,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className="dark" suppressHydrationWarning>
       <body className="bg-background text-foreground min-h-screen">
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

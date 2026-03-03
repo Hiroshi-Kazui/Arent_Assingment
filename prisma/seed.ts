@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -80,6 +81,89 @@ async function main() {
   });
 
   console.log(`✓ Project created: ${project.name}`);
+
+  // Organization seeds
+  const HQ_ORG_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const BRANCH_ORG_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  const hqOrg = await prisma.organization.upsert({
+    where: { organization_id: HQ_ORG_ID },
+    update: {},
+    create: {
+      organization_id: HQ_ORG_ID,
+      name: '本社',
+      type: 'HEADQUARTERS',
+    },
+  });
+  console.log(`✓ Organization created: ${hqOrg.name}`);
+
+  const branchOrg = await prisma.organization.upsert({
+    where: { organization_id: BRANCH_ORG_ID },
+    update: {},
+    create: {
+      organization_id: BRANCH_ORG_ID,
+      name: '東京支店',
+      type: 'BRANCH',
+      parent_id: HQ_ORG_ID,
+    },
+  });
+  console.log(`✓ Organization created: ${branchOrg.name}`);
+
+  // Users (password: "password123" for all)
+  const passwordHash = await bcrypt.hash('password123', 10);
+
+  const ADMIN_USER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  const SUPERVISOR_USER_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const WORKER_USER_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+  await prisma.user.upsert({
+    where: { user_id: ADMIN_USER_ID },
+    update: {},
+    create: {
+      user_id: ADMIN_USER_ID,
+      organization_id: HQ_ORG_ID,
+      name: '管理者太郎',
+      email: 'admin@example.com',
+      password_hash: passwordHash,
+      role: 'ADMIN',
+    },
+  });
+  console.log('✓ User created: admin@example.com (ADMIN)');
+
+  await prisma.user.upsert({
+    where: { user_id: SUPERVISOR_USER_ID },
+    update: {},
+    create: {
+      user_id: SUPERVISOR_USER_ID,
+      organization_id: BRANCH_ORG_ID,
+      name: '監督次郎',
+      email: 'sup@example.com',
+      password_hash: passwordHash,
+      role: 'SUPERVISOR',
+    },
+  });
+  console.log('✓ User created: sup@example.com (SUPERVISOR)');
+
+  await prisma.user.upsert({
+    where: { user_id: WORKER_USER_ID },
+    update: {},
+    create: {
+      user_id: WORKER_USER_ID,
+      organization_id: BRANCH_ORG_ID,
+      name: '作業員三郎',
+      email: 'worker@example.com',
+      password_hash: passwordHash,
+      role: 'WORKER',
+    },
+  });
+  console.log('✓ User created: worker@example.com (WORKER)');
+
+  // Update existing issues' reported_by to use the supervisor user
+  await prisma.issue.updateMany({
+    where: {},
+    data: { reported_by: SUPERVISOR_USER_ID },
+  });
+  console.log('✓ Updated existing issues reported_by to supervisor user');
 
   console.log('✅ Seeding completed successfully!');
 }

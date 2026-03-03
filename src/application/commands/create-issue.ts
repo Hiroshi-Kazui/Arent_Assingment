@@ -7,6 +7,7 @@ import {
 } from '../../domain/models/issue';
 import { ProjectId } from '../../domain/models/project';
 import { FloorId } from '../../domain/models/floor';
+import { UserId } from '../../domain/models/user';
 import { Location } from '../../domain/models/location';
 import { CreateIssueInput } from '../dto/issue-dto';
 import { randomUUID } from 'crypto';
@@ -67,6 +68,7 @@ export class CreateIssueHandler {
     }
 
     const issueType = parseIssueType(input.issueType);
+    const reportedByUserId = UserId.create(input.reportedBy);
 
     const issue = Issue.create(
       issueId,
@@ -75,7 +77,7 @@ export class CreateIssueHandler {
       input.title,
       input.description,
       issueType,
-      1,
+      reportedByUserId,
       location,
       dueDate,
       IssuePriority.Medium

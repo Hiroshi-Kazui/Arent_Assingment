@@ -58,6 +58,40 @@ model Project {
   @@map("project")
 }
 
+model Organization {
+  organization_id String   @id @default(uuid())
+  name            String
+  type            String
+  parent_id       String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  parent   Organization?  @relation("OrgHierarchy", fields: [parent_id], references: [organization_id])
+  children Organization[] @relation("OrgHierarchy")
+  users    User[]
+
+  @@map("organization")
+}
+
+model User {
+  user_id         String   @id @default(uuid())
+  organization_id String
+  name            String
+  email           String   @unique
+  password_hash   String
+  role            String
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organization_id], references: [organization_id], onDelete: Cascade)
+  reported_issues Issue[] @relation("IssueReporter")
+  assigned_issues Issue[] @relation("IssueAssignee")
+  status_change_logs StatusChangeLog[] @relation("StatusChangeLogChanger")
+
+  @@map("user")
+}
+
 model Issue {
   issue_id           String   @id @default(uuid())
   project_id         String
@@ -73,13 +107,17 @@ model Issue {
   world_position_y   Decimal? @db.Decimal(10, 2)
   world_position_z   Decimal? @db.Decimal(10, 2)
   priority           String   @default("MEDIUM")
-  reported_by        Int      @default(1)
+  reported_by        String
+  assignee_id        String?
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
-  project Project @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
-  floor   Floor   @relation(fields: [floor_id], references: [floor_id], onDelete: Cascade)
-  photos  Photo[]
+  project  Project @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  floor    Floor   @relation(fields: [floor_id], references: [floor_id], onDelete: Cascade)
+  reporter User    @relation("IssueReporter", fields: [reported_by], references: [user_id])
+  assignee User?   @relation("IssueAssignee", fields: [assignee_id], references: [user_id])
+  photos   Photo[]
+  status_change_logs StatusChangeLog[]
 
   @@map("issue")
 }
@@ -94,4 +132,19 @@ model Photo {
   issue Issue @relation(fields: [issue_id], references: [issue_id], onDelete: Cascade)
 
   @@map("photo")
+}
+
+model StatusChangeLog {
+  log_id      String   @id @default(uuid())
+  issue_id    String
+  from_status String
+  to_status   String
+  changed_by  String
+  comment     String?
+  changed_at  DateTime @default(now())
+
+  issue           Issue @relation(fields: [issue_id], references: [issue_id], onDelete: Cascade)
+  changed_by_user User  @relation("StatusChangeLogChanger", fields: [changed_by], references: [user_id])
+
+  @@map("status_change_log")
 }
