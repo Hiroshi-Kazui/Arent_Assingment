@@ -63,7 +63,13 @@
       "Bash(ls c:/develop/Arent/Assignment/node_modules/react-day-picker/locale*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''exports'',{}\\), indent=2\\)\\)\")",
       "Bash(npx jest:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(git config --global user.name)",
+      "Bash(git config --global user.email)",
+      "Bash(git config --global --list)",
+      "Bash(ls -la /c/develop/Arent/Assignment/src/app/projects/[id]/floors/)",
+      "Bash(ls -la /c/develop/Arent/Assignment/src/app/projects/[id]/issues/[issueId]/)",
+      "Bash(xargs grep -l \"Organization\\\\|User\\\\|Auth\\\\|StatusChangeLog\")"
     ]
   }
 }

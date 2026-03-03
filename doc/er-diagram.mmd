@@ -1,12 +1,42 @@
 erDiagram
+    Organization ||--o{ Organization : "parent"
+    Organization ||--o{ User : "belongs to"
+    Organization ||--o{ Building : "manages"
+    Organization ||--o{ Project : "manages"
     Building ||--o{ Floor : "has"
     Building ||--o{ Project : "target"
     Project ||--o{ Issue : "contains"
     Floor ||--o{ Issue : "located on"
     Issue ||--o{ Photo : "attached"
+    Issue ||--o{ StatusChangeLog : "history"
+    User ||--o{ Issue : "reported by"
+    User ||--o{ Issue : "assigned to"
+    User ||--o{ StatusChangeLog : "changed by"
+
+    Organization {
+        uuid organization_id PK
+        string name
+        string type "Headquarters or Branch"
+        uuid parent_id FK "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+
+    User {
+        uuid user_id PK
+        uuid organization_id FK
+        string name
+        string email "unique"
+        string password_hash
+        string role "Admin or Supervisor or Worker"
+        boolean is_active "default true"
+        datetime created_at
+        datetime updated_at
+    }
 
     Building {
         uuid building_id PK
+        uuid branch_id FK "Organization Branch"
         string name
         string address
         decimal latitude
@@ -19,7 +49,7 @@ erDiagram
     Floor {
         uuid floor_id PK
         uuid building_id FK
-        string name "e.g. 1F, B1F, RF"
+        string name "1F B1F RF etc"
         int floor_number "sort order"
         datetime created_at
         datetime updated_at
@@ -27,11 +57,12 @@ erDiagram
 
     Project {
         uuid project_id PK
+        uuid branch_id FK "Organization Branch"
         uuid building_id FK
         string name
         date start_date
         date due_date
-        string status "Planning / Active / Completed"
+        string status "Planning or Active or Completed"
         datetime created_at
         datetime updated_at
     }
@@ -42,15 +73,16 @@ erDiagram
         uuid floor_id FK
         string title
         text description
-        string issue_type "Quality / Safety / Construction / Design"
-        string status "Open / InProgress / Done"
-        string location_type "DbId / WorldPosition"
-        int db_id "nullable - Viewer element ID"
+        string issue_type "Quality Safety Construction Design"
+        string status "PointOut Open InProgress Done Confirmed"
+        string location_type "DbId or WorldPosition"
+        int db_id "nullable Viewer element ID"
         decimal world_position_x "nullable"
         decimal world_position_y "nullable"
         decimal world_position_z "nullable"
-        string priority "LOW / MEDIUM / HIGH / CRITICAL"
-        int reported_by "User ID"
+        uuid reported_by FK "User Supervisor only"
+        uuid assignee_id FK "nullable User Worker"
+        date due_date "nullable remediation deadline"
         datetime created_at
         datetime updated_at
     }
@@ -59,6 +91,16 @@ erDiagram
         uuid photo_id PK
         uuid issue_id FK
         string blob_key "storage path"
-        string photo_phase "Before / After"
+        string photo_phase "Before After Rejection"
         datetime uploaded_at
+    }
+
+    StatusChangeLog {
+        uuid log_id PK
+        uuid issue_id FK
+        string from_status "previous status"
+        string to_status "new status"
+        uuid changed_by FK "User who changed"
+        text comment "nullable required on rejection"
+        datetime changed_at
     }
