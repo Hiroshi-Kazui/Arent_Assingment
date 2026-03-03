@@ -44,6 +44,7 @@ export async function getIssueDetail(
       : undefined,
     reportedBy: Number(issue.reported_by),
     createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
     floorId: issue.floor_id,
     photos: issue.photos.map((photo) => ({
       photoId: photo.photo_id,

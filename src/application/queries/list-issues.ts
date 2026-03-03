@@ -41,5 +41,6 @@ export async function listIssues(
       : undefined,
     reportedBy: Number(issue.reported_by),
     createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
   }));
 }

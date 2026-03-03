@@ -4,6 +4,7 @@ import {
   IssueId,
   IssueStatus,
   IssuePriority,
+  IssueType,
 } from './issue';
 import { Location } from './location';
 import { ProjectId } from './project';
@@ -27,7 +28,7 @@ describe('Issue - 状態遷移ロジック', () => {
         floorId,
         'Test Issue',
         'Description',
-        'quality',
+        IssueType.Quality,
         1,
         location,
         new Date()
@@ -41,7 +42,7 @@ describe('Issue - 状態遷移ロジック', () => {
       floorId,
       'Test Issue',
       'Description',
-      'quality',
+      IssueType.Quality,
       1,
       location,
       IssuePriority.Medium,
@@ -153,7 +154,7 @@ describe('Issue - 状態遷移ロジック', () => {
         floorId,
         title,
         description,
-        'quality',
+        IssueType.Quality,
         1,
         location,
         new Date()

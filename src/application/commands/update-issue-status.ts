@@ -1,7 +1,7 @@
 import { IIssueRepository } from '../../domain/repositories/issue-repository';
-import {
-  IssueId,
-} from '../../domain/models/issue';
+import { IPhotoRepository } from '../../domain/repositories/photo-repository';
+import { IssueId } from '../../domain/models/issue';
+import { PhotoPhase } from '../../domain/models/photo';
 import { ProjectId } from '../../domain/models/project';
 import { UpdateIssueStatusInput } from '../dto/issue-dto';
 import { InvalidStatusTransitionError } from '../../domain/errors/invalid-status-transition-error';
@@ -11,7 +11,10 @@ import { InvalidStatusTransitionError } from '../../domain/errors/invalid-status
  * Domain集約の状態遷移メソッドを経由し、不正遷移は例外で通知
  */
 export class UpdateIssueStatusHandler {
-  constructor(private issueRepository: IIssueRepository) {}
+  constructor(
+    private issueRepository: IIssueRepository,
+    private photoRepository: IPhotoRepository
+  ) {}
 
   async execute(input: UpdateIssueStatusInput): Promise<void> {
     const issueId = IssueId.create(input.issueId);
@@ -28,6 +31,16 @@ export class UpdateIssueStatusHandler {
       throw new Error(
         `Issue does not belong to project ${projectId}`
       );
+    }
+
+    // ビジネスルール: InProgress → Done は是正後写真（After）が1枚以上必要
+    // Photo は Issue 集約の外側にあるため Application 層で検証する
+    if (input.newStatus === 'DONE') {
+      const photos = await this.photoRepository.findByIssueId(issueId);
+      const afterPhotos = photos.filter((p) => p.phase === PhotoPhase.After);
+      if (afterPhotos.length === 0) {
+        throw new Error('是正完了には是正後写真が1枚以上必要です');
+      }
     }
 
     // 状態遷移を実行（Domain層で不正遷移は例外が発生）

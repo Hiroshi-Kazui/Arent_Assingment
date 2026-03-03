@@ -29,8 +29,23 @@ async function main() {
 
   console.log(`✓ Building created: ${building.name}`);
 
-  // Floor を作成（1F〜11F）
+  // Floor を作成（B1F, 1F〜11F）
   const floors = [];
+
+  // B1F（地下1階）
+  const b1fFloor = await prisma.floor.upsert({
+    where: { floor_id: '33333333-3333-3333-3333-333333333300' },
+    update: {},
+    create: {
+      floor_id: '33333333-3333-3333-3333-333333333300',
+      building_id: building.building_id,
+      name: 'B1F',
+      floor_number: -1,
+    },
+  });
+  floors.push(b1fFloor);
+  console.log(`✓ Floor created: ${b1fFloor.name}`);
+
   for (let i = 1; i <= 11; i++) {
     const floorId = `33333333-3333-3333-3333-3333333333${String(i).padStart(2, '0')}`;
     const floor = await prisma.floor.upsert({

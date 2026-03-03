@@ -15,6 +15,21 @@ import { CreateIssueHandler } from './commands/create-issue';
 import { UpdateIssueStatusHandler } from './commands/update-issue-status';
 import { AddPhotoHandler } from './commands/add-photo';
 
+// ApsTokenProvider はキャッシュを内部で持つため、シングルトンとして保持
+// リクエストごとに新規インスタンスを生成するとキャッシュが無効になる
+const globalWithProviders = global as typeof globalThis & {
+  apsTokenProvider?: ApsTokenProvider;
+};
+
+function getApsTokenProvider(): ApsTokenProvider {
+  if (!globalWithProviders.apsTokenProvider) {
+    const clientId = process.env.APS_CLIENT_ID || '';
+    const clientSecret = process.env.APS_CLIENT_SECRET || '';
+    globalWithProviders.apsTokenProvider = new ApsTokenProvider(clientId, clientSecret);
+  }
+  return globalWithProviders.apsTokenProvider;
+}
+
 /**
  * Repository インスタンスを取得
  */
@@ -42,10 +57,8 @@ export function getStorages() {
  * Provider インスタンスを取得
  */
 export function getProviders() {
-  const clientId = process.env.APS_CLIENT_ID || '';
-  const clientSecret = process.env.APS_CLIENT_SECRET || '';
   return {
-    viewerTokenProvider: new ApsTokenProvider(clientId, clientSecret),
+    viewerTokenProvider: getApsTokenProvider(),
   };
 }
 
@@ -58,7 +71,7 @@ export function getCommandHandlers() {
 
   return {
     createIssue: new CreateIssueHandler(repos.issue),
-    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue),
+    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue, repos.photo),
     addPhoto: new AddPhotoHandler(
       repos.issue,
       storages.photoStorage,

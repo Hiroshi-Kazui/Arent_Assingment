@@ -43,6 +43,7 @@ export interface IssueListItemDto {
   worldPositionZ?: number;
   reportedBy: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 /**

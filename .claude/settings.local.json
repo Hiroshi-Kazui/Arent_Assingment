@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(git init)",
@@ -58,7 +61,9 @@
       "WebFetch(domain:ui.shadcn.com)",
       "Bash(ls c:/develop/Arent/Assignment/node_modules/react-day-picker/dist/esm/locale*)",
       "Bash(ls c:/develop/Arent/Assignment/node_modules/react-day-picker/locale*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''exports'',{}\\), indent=2\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''exports'',{}\\), indent=2\\)\\)\")",
+      "Bash(npx jest:*)",
+      "Bash(npx vitest:*)"
     ]
   }
 }

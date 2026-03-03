@@ -20,6 +20,18 @@ export const IssueId = {
 };
 
 /**
+ * Issue Type 列挙型
+ * 指摘の種別を表す
+ * Quality: 品質不良 / Safety: 安全不備 / Construction: 施工不備 / Design: 設計変更
+ */
+export enum IssueType {
+  Quality = 'QUALITY',
+  Safety = 'SAFETY',
+  Construction = 'CONSTRUCTION',
+  Design = 'DESIGN',
+}
+
+/**
  * Issue Status 列挙型
  */
 export enum IssueStatus {
@@ -50,7 +62,7 @@ export class Issue {
     readonly floorId: FloorId,
     readonly title: string,
     readonly description: string,
-    readonly issueType: string | undefined,
+    readonly issueType: IssueType | undefined,
     readonly reportedBy: number,
     readonly location: Location,
     readonly priority: IssuePriority,
@@ -69,7 +81,7 @@ export class Issue {
     floorId: FloorId,
     title: string,
     description: string,
-    issueType: string | undefined,
+    issueType: IssueType | undefined,
     reportedBy: number,
     location: Location,
     dueDate: Date,
@@ -113,7 +125,7 @@ export class Issue {
     floorId: FloorId,
     title: string,
     description: string,
-    issueType: string | undefined,
+    issueType: IssueType | undefined,
     reportedBy: number,
     location: Location,
     priority: IssuePriority,
@@ -169,6 +181,11 @@ export class Issue {
 
   /**
    * 状態遷移：InProgress → Done（是正完了）
+   *
+   * ビジネスルール: 是正後写真（After）が1枚以上必要。
+   * ただし、この制約は Issue 集約の外側（Photo エンティティ）にある情報に依存するため、
+   * Application 層の UpdateIssueStatusHandler で検証する。
+   * （集約外部の情報を集約内で参照することは DDD の境界違反になる）
    */
   complete(): Issue {
     if (this.status !== IssueStatus.InProgress) {

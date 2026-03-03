@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { CreateIssueHandler } from './create-issue';
 import { UpdateIssueStatusHandler } from './update-issue-status';
 import { PrismaIssueRepository } from '../../infrastructure/prisma/prisma-issue-repository';
+import { PrismaPhotoRepository } from '../../infrastructure/prisma/prisma-photo-repository';
 import { listIssues } from '../queries/list-issues';
 import { getIssueDetail } from '../queries/get-issue-detail';
 import { IssueId } from '../../domain/models/issue';
@@ -12,9 +13,11 @@ import prisma from '../../infrastructure/prisma/prisma-client';
 
 describe('Issue Commands - 統合テスト', () => {
   const issueRepository = new PrismaIssueRepository();
+  const photoRepository = new PrismaPhotoRepository();
   const createIssueHandler = new CreateIssueHandler(issueRepository);
   const updateStatusHandler = new UpdateIssueStatusHandler(
-    issueRepository
+    issueRepository,
+    photoRepository
   );
 
   const projectId = ProjectId.create(
@@ -119,6 +122,17 @@ describe('Issue Commands - 統合テスト', () => {
 
     it('InProgress → Done への遷移が成功', async () => {
       // 前提：Open → InProgress 済み
+      // ビジネスルール: DONE 遷移には是正後写真（AFTER）が1枚以上必要
+      await prisma.photo.create({
+        data: {
+          photo_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          issue_id: createdIssueId,
+          blob_key: `projects/test/issues/${createdIssueId}/photos/after.jpg`,
+          photo_phase: 'AFTER',
+          uploaded_at: new Date(),
+        },
+      });
+
       await updateStatusHandler.execute({
         issueId: createdIssueId,
         projectId: projectId,

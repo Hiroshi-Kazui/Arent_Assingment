@@ -4,6 +4,7 @@ import {
   IssueId,
   IssueStatus,
   IssuePriority,
+  IssueType,
 } from '../../domain/models/issue';
 import { ProjectId } from '../../domain/models/project';
 import { FloorId } from '../../domain/models/floor';
@@ -103,14 +104,15 @@ export class PrismaIssueRepository implements IIssueRepository {
    */
   private mapToDomainModel(record: any): Issue {
     // Location の再構築
+    // db_id は 0 が有効値でないため null/undefined チェックで十分
     let location: Location;
-    if (record.location_type === 'dbId' && record.db_id) {
+    if (record.location_type === 'dbId' && record.db_id != null) {
       location = Location.createFromDbId(String(record.db_id));
     } else if (
       record.location_type === 'worldPosition' &&
-      record.world_position_x &&
-      record.world_position_y &&
-      record.world_position_z
+      record.world_position_x != null &&
+      record.world_position_y != null &&
+      record.world_position_z != null
     ) {
       location = Location.createFromWorldPosition(
         Number(record.world_position_x),
@@ -119,9 +121,16 @@ export class PrismaIssueRepository implements IIssueRepository {
       );
     } else {
       throw new Error(
-        `Invalid location data for issue ${record.issue_id}`
+        `Invalid location data for issue ${record.issue_id}: location_type=${record.location_type}`
       );
     }
+
+    // issue_type: DB は nullable String なので、有効な IssueType 値かバリデートして変換
+    const issueTypeValues = Object.values(IssueType) as string[];
+    const issueType: IssueType | undefined =
+      record.issue_type != null && issueTypeValues.includes(record.issue_type)
+        ? (record.issue_type as IssueType)
+        : undefined;
 
     return Issue.reconstruct(
       record.issue_id as IssueId,
@@ -129,7 +138,7 @@ export class PrismaIssueRepository implements IIssueRepository {
       record.floor_id as FloorId,
       record.title,
       record.description,
-      record.issue_type ?? undefined,
+      issueType,
       Number(record.reported_by),
       location,
       record.priority as IssuePriority,
