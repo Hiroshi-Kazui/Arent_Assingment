@@ -4,6 +4,9 @@
   "description": "Construction site issue management tool",
   "main": "dist/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
