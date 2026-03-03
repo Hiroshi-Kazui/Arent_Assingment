@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProjectDetail } from '@/application/queries/get-project-detail';
 import { ProjectId } from '@/domain/models/project';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireSession } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -16,6 +17,9 @@ export async function GET(
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireSession();
+    if ('error' in auth) return auth.error;
+
     const { id } = await params;
     const projectId = ProjectId.create(id);
     const project = await getProjectDetail(projectId);

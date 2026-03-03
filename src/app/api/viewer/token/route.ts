@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getProviders } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireSession } from '@/api/utils/auth';
 
 export async function GET() {
   try {
+    const auth = await requireSession();
+    if ('error' in auth) return auth.error;
+
     if (!process.env.APS_CLIENT_ID || !process.env.APS_CLIENT_SECRET) {
       return NextResponse.json(
         { error: 'APS credentials not configured' },

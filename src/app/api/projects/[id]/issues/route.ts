@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/infrastructure/auth/nextauth-options';
 import { getCommandHandlers } from '@/application/di';
 import {
   listIssues,
@@ -8,6 +6,7 @@ import {
 import { CreateIssueInput } from '@/application/dto/issue-dto';
 import { ProjectId } from '@/domain/models/project';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireSession, requireRole } from '@/api/utils/auth';
 import prisma from '@/infrastructure/prisma/prisma-client';
 
 interface Params {
@@ -34,6 +33,9 @@ export async function GET(
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireSession();
+    if ('error' in auth) return auth.error;
+
     const { id } = await params;
     const projectId = ProjectId.create(id);
     const url = new URL(request.url);
@@ -51,7 +53,7 @@ export async function GET(
 
 /**
  * POST /api/projects/[id]/issues
- * 新しい Issue を作成
+ * 新しい Issue を作成（Supervisor のみ）
  */
 export async function POST(
   request: Request,
@@ -59,10 +61,8 @@ export async function POST(
 ) {
   let createdIssueId: string | null = null;
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireRole('SUPERVISOR');
+    if ('error' in auth) return auth.error;
 
     const { id } = await params;
     const contentType = request.headers.get('content-type') || '';
@@ -202,7 +202,7 @@ export async function POST(
       title,
       description,
       issueType,
-      reportedBy: session.user.id,
+      reportedBy: auth.user.id,
       dueDate,
       locationType: locationType as 'dbId' | 'worldPosition',
       dbId,

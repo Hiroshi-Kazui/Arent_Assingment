@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCommandHandlers } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireSession } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -10,13 +11,17 @@ interface Params {
 /**
  * PATCH /api/projects/[id]/issues/[issueId]/status
  * Issue のステータスを更新
- * リクエストボディ: { status: string, comment?: string, changedBy?: string }
+ * リクエストボディ: { status: string, comment?: string }
+ * changedBy はセッションから自動取得（クライアント値を信用しない）
  */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireSession();
+    if ('error' in auth) return auth.error;
+
     const { id, issueId } = await params;
     const body = await request.json();
 
@@ -58,7 +63,7 @@ export async function PATCH(
       projectId: id,
       newStatus: normalizedStatus,
       comment: body.comment ?? undefined,
-      changedBy: body.changedBy ?? '',
+      changedBy: auth.user.id,
     });
 
     return successResponse({

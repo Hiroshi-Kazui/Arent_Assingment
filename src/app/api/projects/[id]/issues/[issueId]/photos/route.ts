@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCommandHandlers } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireRole } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -19,7 +20,7 @@ function getFileExtension(fileName: string): string {
 
 /**
  * POST /api/projects/[id]/issues/[issueId]/photos
- * Photo をアップロード
+ * Photo をアップロード（Supervisor, Worker のみ）
  * multipart/form-data で files[] (or file) と photoPhase を受け取る
  */
 export async function POST(
@@ -27,6 +28,9 @@ export async function POST(
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireRole('SUPERVISOR', 'WORKER');
+    if ('error' in auth) return auth.error;
+
     const { id, issueId } = await params;
     const formData = await request.formData();
 

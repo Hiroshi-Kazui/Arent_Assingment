@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCommandHandlers } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireRole } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -10,13 +11,18 @@ interface Params {
 /**
  * PATCH /api/projects/[id]/issues/[issueId]/assignee
  * Issue の担当者を割り当て（PointOut → Open への遷移を含む）
- * リクエストボディ: { assigneeId: string, changedBy: string }
+ * Supervisor のみ実行可能
+ * リクエストボディ: { assigneeId: string }
+ * changedBy はセッションから自動取得
  */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireRole('SUPERVISOR');
+    if ('error' in auth) return auth.error;
+
     const { id, issueId } = await params;
     const body = await request.json();
 
@@ -26,19 +32,13 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    if (!body.changedBy) {
-      return NextResponse.json(
-        { error: 'Missing required field: changedBy' },
-        { status: 400 }
-      );
-    }
 
     const handlers = getCommandHandlers();
     await handlers.assignIssue.execute({
       issueId,
       projectId: id,
       assigneeId: body.assigneeId,
-      changedBy: body.changedBy,
+      changedBy: auth.user.id,
     });
 
     return successResponse({ message: 'Assignee updated successfully' });

@@ -4,6 +4,7 @@ import {
 } from '@/application/queries/get-issue-detail';
 import { IssueId } from '@/domain/models/issue';
 import { handleError, successResponse } from '@/api/utils/error-handler';
+import { requireSession } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -19,6 +20,9 @@ export async function GET(
   { params }: { params: Promise<Params> }
 ) {
   try {
+    const auth = await requireSession();
+    if ('error' in auth) return auth.error;
+
     const { id, issueId: issueIdParam } = await params;
     const issueId = IssueId.create(issueIdParam);
     const detail = await getIssueDetail(issueId);
