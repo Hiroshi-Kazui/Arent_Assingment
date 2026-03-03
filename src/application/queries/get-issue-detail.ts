@@ -4,7 +4,7 @@ import prisma from '../../infrastructure/prisma/prisma-client';
 
 /**
  * 指定 Issue の詳細を取得
- * Photos も含む
+ * Photos, StatusChangeLogs, Assignee も含む
  */
 export async function getIssueDetail(
   issueId: IssueId
@@ -15,6 +15,11 @@ export async function getIssueDetail(
       photos: {
         orderBy: { uploaded_at: 'desc' },
       },
+      status_change_logs: {
+        orderBy: { changed_at: 'asc' },
+        include: { changed_by_user: { select: { name: true } } },
+      },
+      assignee: { select: { name: true } },
     },
   });
 
@@ -29,7 +34,7 @@ export async function getIssueDetail(
     description: issue.description,
     issueType: issue.issue_type ?? undefined,
     dueDate: issue.due_date.toISOString(),
-    status: issue.status as 'OPEN' | 'IN_PROGRESS' | 'DONE',
+    status: issue.status as 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED',
     priority: issue.priority,
     locationType: issue.location_type as 'dbId' | 'worldPosition',
     dbId: issue.db_id ? String(issue.db_id) : undefined,
@@ -42,7 +47,7 @@ export async function getIssueDetail(
     worldPositionZ: issue.world_position_z
       ? Number(issue.world_position_z)
       : undefined,
-    reportedBy: Number(issue.reported_by),
+    reportedBy: issue.reported_by,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
     floorId: issue.floor_id,
@@ -51,6 +56,16 @@ export async function getIssueDetail(
       blobKey: photo.blob_key,
       photoPhase: photo.photo_phase as 'BEFORE' | 'AFTER',
       uploadedAt: photo.uploaded_at,
+    })),
+    assigneeId: issue.assignee_id ?? undefined,
+    assigneeName: issue.assignee?.name ?? undefined,
+    statusChangeLogs: issue.status_change_logs.map((log) => ({
+      logId: log.log_id,
+      fromStatus: log.from_status,
+      toStatus: log.to_status,
+      changedByName: log.changed_by_user.name,
+      comment: log.comment ?? undefined,
+      changedAt: log.changed_at.toISOString(),
     })),
   };
 }

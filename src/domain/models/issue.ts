@@ -1,6 +1,7 @@
 import { ProjectId } from './project';
 import { FloorId } from './floor';
 import { Location, LocationType } from './location';
+import { UserId } from './user';
 import {
   InvalidStatusTransitionError,
 } from '../errors/invalid-status-transition-error';
@@ -35,9 +36,11 @@ export enum IssueType {
  * Issue Status 列挙型
  */
 export enum IssueStatus {
+  PointOut = 'POINT_OUT',
   Open = 'OPEN',
   InProgress = 'IN_PROGRESS',
   Done = 'DONE',
+  Confirmed = 'CONFIRMED',
 }
 
 /**
@@ -63,13 +66,14 @@ export class Issue {
     readonly title: string,
     readonly description: string,
     readonly issueType: IssueType | undefined,
-    readonly reportedBy: number,
+    readonly reportedBy: UserId,
     readonly location: Location,
     readonly priority: IssuePriority,
     readonly status: IssueStatus,
     readonly dueDate: Date,
     readonly createdAt: Date,
-    readonly updatedAt: Date
+    readonly updatedAt: Date,
+    readonly assigneeId: UserId | undefined = undefined
   ) {}
 
   /**
@@ -82,7 +86,7 @@ export class Issue {
     title: string,
     description: string,
     issueType: IssueType | undefined,
-    reportedBy: number,
+    reportedBy: UserId,
     location: Location,
     dueDate: Date,
     priority: IssuePriority = IssuePriority.Medium
@@ -109,10 +113,11 @@ export class Issue {
       reportedBy,
       location,
       priority,
-      IssueStatus.Open,
+      IssueStatus.PointOut,
       dueDate,
       now,
-      now
+      now,
+      undefined
     );
   }
 
@@ -126,13 +131,14 @@ export class Issue {
     title: string,
     description: string,
     issueType: IssueType | undefined,
-    reportedBy: number,
+    reportedBy: UserId,
     location: Location,
     priority: IssuePriority,
     status: IssueStatus,
     dueDate: Date,
     createdAt: Date,
-    updatedAt: Date
+    updatedAt: Date,
+    assigneeId: UserId | undefined
   ): Issue {
     return new Issue(
       id,
@@ -147,7 +153,8 @@ export class Issue {
       status,
       dueDate,
       createdAt,
-      updatedAt
+      updatedAt,
+      assigneeId
     );
   }
 
@@ -175,7 +182,8 @@ export class Issue {
       IssueStatus.InProgress,
       this.dueDate,
       this.createdAt,
-      new Date()
+      new Date(),
+      this.assigneeId
     );
   }
 
@@ -205,7 +213,8 @@ export class Issue {
       IssueStatus.Done,
       this.dueDate,
       this.createdAt,
-      new Date()
+      new Date(),
+      this.assigneeId
     );
   }
 
@@ -230,7 +239,8 @@ export class Issue {
       IssueStatus.Open,
       this.dueDate,
       this.createdAt,
-      new Date()
+      new Date(),
+      this.assigneeId
     );
   }
 
@@ -258,7 +268,8 @@ export class Issue {
       IssueStatus.InProgress,
       this.dueDate,
       this.createdAt,
-      new Date()
+      new Date(),
+      this.assigneeId
     );
   }
 
@@ -305,7 +316,126 @@ export class Issue {
       this.status,
       this.dueDate,
       this.createdAt,
-      new Date()
+      new Date(),
+      this.assigneeId
     );
+  }
+
+  /**
+   * 状態遷移：PointOut → Open（Assignee設定時）
+   */
+  assignTo(assigneeId: UserId): Issue {
+    if (this.status !== IssueStatus.PointOut) {
+      throw new InvalidStatusTransitionError(this.status, IssueStatus.Open);
+    }
+
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      IssueStatus.Open,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      assigneeId
+    );
+  }
+
+  /**
+   * 状態遷移：Done → Confirmed（Supervisor承認）
+   */
+  confirm(): Issue {
+    if (this.status !== IssueStatus.Done) {
+      throw new InvalidStatusTransitionError(this.status, IssueStatus.Confirmed);
+    }
+
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      IssueStatus.Confirmed,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      this.assigneeId
+    );
+  }
+
+  /**
+   * 状態遷移：Done → Open（否認）
+   */
+  rejectCompletion(): Issue {
+    if (this.status !== IssueStatus.Done) {
+      throw new InvalidStatusTransitionError(this.status, IssueStatus.Open);
+    }
+
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      IssueStatus.Open,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      this.assigneeId
+    );
+  }
+
+  /**
+   * 状態遷移：Confirmed → Open（再指摘）
+   */
+  reissue(): Issue {
+    if (this.status !== IssueStatus.Confirmed) {
+      throw new InvalidStatusTransitionError(this.status, IssueStatus.Open);
+    }
+
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      IssueStatus.Open,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      this.assigneeId
+    );
+  }
+
+  /**
+   * PointOut 状態か判定
+   */
+  isPointOut(): boolean {
+    return this.status === IssueStatus.PointOut;
+  }
+
+  /**
+   * Confirmed 状態か判定
+   */
+  isConfirmed(): boolean {
+    return this.status === IssueStatus.Confirmed;
   }
 }

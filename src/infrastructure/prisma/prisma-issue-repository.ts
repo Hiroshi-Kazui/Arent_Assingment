@@ -9,6 +9,7 @@ import {
 import { ProjectId } from '../../domain/models/project';
 import { FloorId } from '../../domain/models/floor';
 import { Location } from '../../domain/models/location';
+import { UserId } from '../../domain/models/user';
 import prisma from './prisma-client';
 
 /**
@@ -41,6 +42,7 @@ export class PrismaIssueRepository implements IIssueRepository {
         world_position_x: x !== undefined ? String(x) : null,
         world_position_y: y !== undefined ? String(y) : null,
         world_position_z: z !== undefined ? String(z) : null,
+        assignee_id: issue.assigneeId ?? null,
         updated_at: issue.updatedAt,
       },
       create: {
@@ -59,6 +61,7 @@ export class PrismaIssueRepository implements IIssueRepository {
         world_position_x: x !== undefined ? String(x) : null,
         world_position_y: y !== undefined ? String(y) : null,
         world_position_z: z !== undefined ? String(z) : null,
+        assignee_id: issue.assigneeId ?? null,
         created_at: issue.createdAt,
         updated_at: issue.updatedAt,
       },
@@ -139,13 +142,14 @@ export class PrismaIssueRepository implements IIssueRepository {
       record.title,
       record.description,
       issueType,
-      Number(record.reported_by),
+      record.reported_by as UserId,
       location,
       record.priority as IssuePriority,
       record.status as IssueStatus,
       record.due_date,
       record.created_at,
-      record.updated_at
+      record.updated_at,
+      record.assignee_id ? (record.assignee_id as UserId) : undefined
     );
   }
 }

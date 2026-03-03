@@ -11,7 +11,7 @@ export async function listIssues(
   projectId: ProjectId,
   floorId?: FloorId
 ): Promise<IssueListItemDto[]> {
-  const where: any = { project_id: projectId };
+  const where: { project_id: string; floor_id?: string } = { project_id: projectId };
   if (floorId) {
     where.floor_id = floorId;
   }
@@ -26,7 +26,7 @@ export async function listIssues(
     title: issue.title,
     issueType: issue.issue_type ?? undefined,
     dueDate: issue.due_date.toISOString(),
-    status: issue.status as 'OPEN' | 'IN_PROGRESS' | 'DONE',
+    status: issue.status as 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED',
     priority: issue.priority,
     locationType: issue.location_type as 'dbId' | 'worldPosition',
     dbId: issue.db_id ? String(issue.db_id) : undefined,
@@ -39,7 +39,7 @@ export async function listIssues(
     worldPositionZ: issue.world_position_z
       ? Number(issue.world_position_z)
       : undefined,
-    reportedBy: Number(issue.reported_by),
+    reportedBy: issue.reported_by,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
   }));

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 export interface IssueMarker {
   issueId: string;
   title: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  status: 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED';
   dbId?: number;
   position?: { x: number; y: number };
   worldPosition?: { x: number; y: number; z: number };
@@ -65,9 +65,19 @@ export function IssueMarkers({
     overlayContainer.innerHTML = '';
 
     const colors: Record<string, string> = {
-      OPEN: '#ef4444', // Tailwind red-500
-      IN_PROGRESS: '#eab308', // Safety Yellow
-      DONE: '#22c55e', // Tailwind green-500
+      POINT_OUT: '#9CA3AF',   // gray
+      OPEN: '#3B82F6',        // blue
+      IN_PROGRESS: '#F59E0B', // yellow
+      DONE: '#10B981',        // green
+      CONFIRMED: '#8B5CF6',   // purple
+    };
+
+    const icons: Record<string, string> = {
+      POINT_OUT: '?',
+      OPEN: '!',
+      IN_PROGRESS: '\u25D0',
+      DONE: '\u2713',
+      CONFIRMED: '\u2605',
     };
 
     markers.forEach((marker) => {
@@ -100,7 +110,7 @@ export function IssueMarkers({
           color: white;
           box-shadow: ${isHighlighted ? '0 0 0 3px ' + color + '66, 0 4px 12px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.3)'};
         ">
-          ${marker.status === 'OPEN' ? '!' : marker.status === 'IN_PROGRESS' ? '◐' : '✓'}
+          ${icons[marker.status] || '!'}
         </div>
         <div style="
           position: absolute;

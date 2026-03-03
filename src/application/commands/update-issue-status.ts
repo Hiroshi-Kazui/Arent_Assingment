@@ -1,10 +1,14 @@
 import { IIssueRepository } from '../../domain/repositories/issue-repository';
 import { IPhotoRepository } from '../../domain/repositories/photo-repository';
+import { IStatusChangeLogRepository } from '../../domain/repositories/status-change-log-repository';
 import { IssueId } from '../../domain/models/issue';
 import { PhotoPhase } from '../../domain/models/photo';
 import { ProjectId } from '../../domain/models/project';
+import { UserId } from '../../domain/models/user';
+import { StatusChangeLog, StatusChangeLogId } from '../../domain/models/status-change-log';
 import { UpdateIssueStatusInput } from '../dto/issue-dto';
 import { InvalidStatusTransitionError } from '../../domain/errors/invalid-status-transition-error';
+import { randomUUID } from 'crypto';
 
 /**
  * Issue ステータス更新コマンド
@@ -13,20 +17,20 @@ import { InvalidStatusTransitionError } from '../../domain/errors/invalid-status
 export class UpdateIssueStatusHandler {
   constructor(
     private issueRepository: IIssueRepository,
-    private photoRepository: IPhotoRepository
+    private photoRepository: IPhotoRepository,
+    private statusChangeLogRepository: IStatusChangeLogRepository
   ) {}
 
   async execute(input: UpdateIssueStatusInput): Promise<void> {
     const issueId = IssueId.create(input.issueId);
     const projectId = ProjectId.create(input.projectId);
+    const changedBy = UserId.create(input.changedBy);
 
-    // Issue を取得
     const issue = await this.issueRepository.findById(issueId);
     if (!issue) {
       throw new Error(`Issue not found: ${issueId}`);
     }
 
-    // プロジェクト ID の一致確認
     if (issue.projectId !== projectId) {
       throw new Error(
         `Issue does not belong to project ${projectId}`
@@ -34,7 +38,6 @@ export class UpdateIssueStatusHandler {
     }
 
     // ビジネスルール: InProgress → Done は是正後写真（After）が1枚以上必要
-    // Photo は Issue 集約の外側にあるため Application 層で検証する
     if (input.newStatus === 'DONE') {
       const photos = await this.photoRepository.findByIssueId(issueId);
       const afterPhotos = photos.filter((p) => p.phase === PhotoPhase.After);
@@ -43,18 +46,34 @@ export class UpdateIssueStatusHandler {
       }
     }
 
-    // 状態遷移を実行（Domain層で不正遷移は例外が発生）
+    // コメント必須チェック（否認・再指摘時）
+    if (
+      (issue.isDone() && input.newStatus === 'OPEN') ||
+      (issue.isConfirmed() && input.newStatus === 'OPEN')
+    ) {
+      if (!input.comment || input.comment.trim().length === 0) {
+        throw new Error('否認・再指摘にはコメントが必須です');
+      }
+    }
+
+    const fromStatus = issue.status;
     let updatedIssue = issue;
 
-    // 現在の状態と遷移先から適切なメソッドを選択
+    // 状態遷移を実行（Domain層で不正遷移は例外が発生）
     if (issue.isOpen() && input.newStatus === 'IN_PROGRESS') {
-      updatedIssue = issue.startWork(); // Open -> InProgress
+      updatedIssue = issue.startWork();
     } else if (issue.isInProgress() && input.newStatus === 'DONE') {
-      updatedIssue = issue.complete(); // InProgress -> Done
+      updatedIssue = issue.complete();
     } else if (issue.isInProgress() && input.newStatus === 'OPEN') {
-      updatedIssue = issue.rejectWork(); // InProgress -> Open
+      updatedIssue = issue.rejectWork();
     } else if (issue.isDone() && input.newStatus === 'IN_PROGRESS') {
-      updatedIssue = issue.reopenAfterCompletion(); // Done -> InProgress
+      updatedIssue = issue.reopenAfterCompletion();
+    } else if (issue.isDone() && input.newStatus === 'CONFIRMED') {
+      updatedIssue = issue.confirm();
+    } else if (issue.isDone() && input.newStatus === 'OPEN') {
+      updatedIssue = issue.rejectCompletion();
+    } else if (issue.isConfirmed() && input.newStatus === 'OPEN') {
+      updatedIssue = issue.reissue();
     } else {
       throw new InvalidStatusTransitionError(
         issue.status,
@@ -62,7 +81,17 @@ export class UpdateIssueStatusHandler {
       );
     }
 
-    // 更新後の Issue を永続化
     await this.issueRepository.save(updatedIssue);
+
+    // StatusChangeLog 記録
+    const log = StatusChangeLog.create(
+      StatusChangeLogId.create(randomUUID()),
+      issueId,
+      fromStatus,
+      updatedIssue.status,
+      changedBy,
+      input.comment
+    );
+    await this.statusChangeLogRepository.save(log);
   }
 }

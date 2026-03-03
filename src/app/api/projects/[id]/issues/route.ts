@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/infrastructure/auth/nextauth-options';
 import { getCommandHandlers } from '@/application/di';
 import {
   listIssues,
@@ -57,6 +59,11 @@ export async function POST(
 ) {
   let createdIssueId: string | null = null;
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const contentType = request.headers.get('content-type') || '';
     let floorId = '';
@@ -195,6 +202,7 @@ export async function POST(
       title,
       description,
       issueType,
+      reportedBy: session.user.id,
       dueDate,
       locationType: locationType as 'dbId' | 'worldPosition',
       dbId,

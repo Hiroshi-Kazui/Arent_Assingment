@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,15 +11,31 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Photo {
   photoId: string;
   blobKey: string;
   photoPhase: 'BEFORE' | 'AFTER';
   uploadedAt: string;
+}
+
+interface StatusChangeLogEntry {
+  logId: string;
+  fromStatus: string;
+  toStatus: string;
+  changedByName: string;
+  comment?: string;
+  changedAt: string;
 }
 
 interface IssueDetail {
@@ -28,7 +45,7 @@ interface IssueDetail {
   description: string;
   issueType?: string;
   dueDate: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  status: 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED';
   priority: string;
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
@@ -36,9 +53,12 @@ interface IssueDetail {
   worldPositionY?: number;
   worldPositionZ?: number;
   floorId: string;
-  reportedBy: number;
+  reportedBy: string;
   createdAt: string;
   photos: Photo[];
+  assigneeId?: string;
+  assigneeName?: string;
+  statusChangeLogs: StatusChangeLogEntry[];
 }
 
 interface IssueDetailPanelProps {
@@ -47,16 +67,26 @@ interface IssueDetailPanelProps {
   onIssueUpdated?: () => void;
 }
 
+interface UserOption {
+  userId: string;
+  name: string;
+  role: string;
+}
+
 const STATUS_LABELS: Record<string, string> = {
+  POINT_OUT: '指摘',
   OPEN: '未対応',
   IN_PROGRESS: '対応中',
   DONE: '完了',
+  CONFIRMED: '承認済',
 };
 
 const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  POINT_OUT: 'outline',
   OPEN: 'destructive',
   IN_PROGRESS: 'default',
   DONE: 'secondary',
+  CONFIRMED: 'default',
 };
 
 const ISSUE_TYPE_LABELS: Record<string, string> = {
@@ -66,19 +96,26 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   design: '設計',
 };
 
-const TRANSITIONS: Record<string, Array<{ status: string; label: string }>> = {
-  OPEN: [{ status: 'IN_PROGRESS', label: '対応開始' }],
+const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsComment?: boolean }>> = {
+  POINT_OUT: [{ status: 'ASSIGN', label: '担当者を割り振る' }],
+  OPEN: [{ status: 'IN_PROGRESS', label: '着手する' }],
   IN_PROGRESS: [
-    { status: 'DONE', label: '完了にする' },
+    { status: 'DONE', label: '是正完了' },
     { status: 'OPEN', label: '差し戻し' },
   ],
-  DONE: [{ status: 'IN_PROGRESS', label: '再対応' }],
+  DONE: [
+    { status: 'CONFIRMED', label: '承認' },
+    { status: 'OPEN', label: '否認', needsComment: true },
+  ],
+  CONFIRMED: [{ status: 'OPEN', label: '再指摘', needsComment: true }],
 };
 
-const TRANSITION_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  OPEN: 'destructive',
-  IN_PROGRESS: 'default',
-  DONE: 'secondary',
+const TRANSITION_BUTTON_STYLES: Record<string, string> = {
+  IN_PROGRESS: '',
+  DONE: '',
+  CONFIRMED: 'bg-purple-600 hover:bg-purple-700 text-white',
+  OPEN: 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300',
+  ASSIGN: '',
 };
 
 const CAROUSEL_LAYOUT_CLASS = 'w-full px-10 sm:px-11';
@@ -116,6 +153,7 @@ export function IssueDetailPanel({
   issueId,
   onIssueUpdated,
 }: IssueDetailPanelProps) {
+  const { data: session } = useSession();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +165,19 @@ export function IssueDetailPanel({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const beforeFileInputRef = useRef<HTMLInputElement>(null);
   const afterFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Comment modal state
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [commentModalTarget, setCommentModalTarget] = useState<string>('');
+  const [commentText, setCommentText] = useState('');
+
+  // Assignee modal state
+  const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [assigneeUpdating, setAssigneeUpdating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,7 +227,7 @@ export function IssueDetailPanel({
     setPhotoUrls(urls);
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: string, comment?: string) => {
     if (!issue) return;
     if (
       newStatus === 'DONE' &&
@@ -191,7 +242,11 @@ export function IssueDetailPanel({
       const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          comment,
+          changedBy: session?.user?.id ?? '',
+        }),
       });
 
       if (!res.ok) {
@@ -205,6 +260,70 @@ export function IssueDetailPanel({
       alert('ステータス更新エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleTransitionClick = (transition: { status: string; label: string; needsComment?: boolean }) => {
+    if (transition.status === 'ASSIGN') {
+      openAssigneeModal();
+      return;
+    }
+    if (transition.needsComment) {
+      setCommentModalTarget(transition.status);
+      setCommentText('');
+      setCommentModalOpen(true);
+      return;
+    }
+    handleStatusChange(transition.status);
+  };
+
+  const handleCommentSubmit = () => {
+    if (!commentText.trim()) return;
+    setCommentModalOpen(false);
+    handleStatusChange(commentModalTarget, commentText.trim());
+  };
+
+  const openAssigneeModal = async () => {
+    setAssigneeModalOpen(true);
+    setSelectedUserId('');
+    setUsersError(false);
+
+    try {
+      setUsersLoading(true);
+      const res = await fetch('/api/users');
+      if (!res.ok) {
+        setUsersError(true);
+        return;
+      }
+      const data: UserOption[] = await res.json();
+      setUsers(data.filter((u) => u.role === 'WORKER' || u.role === 'ADMIN'));
+    } catch {
+      setUsersError(true);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleAssigneeSubmit = async () => {
+    if (!selectedUserId.trim()) return;
+    try {
+      setAssigneeUpdating(true);
+      const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/assignee`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeId: selectedUserId.trim(), changedBy: session?.user?.id ?? '' }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error ?? `Failed (${res.status})`);
+      }
+      setAssigneeModalOpen(false);
+      onIssueUpdated?.();
+      await reloadIssue();
+    } catch (err) {
+      alert('担当者割り振りエラー: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setAssigneeUpdating(false);
     }
   };
 
@@ -255,7 +374,7 @@ export function IssueDetailPanel({
   const showAfterNavigation = afterPhotos.length >= 4;
   const transitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
   const isOverdue = issue
-    ? issue.status !== 'DONE' &&
+    ? issue.status !== 'DONE' && issue.status !== 'CONFIRMED' &&
       new Date(issue.dueDate).setHours(0, 0, 0, 0) <=
         new Date().setHours(0, 0, 0, 0)
     : false;
@@ -319,54 +438,77 @@ export function IssueDetailPanel({
               </Badge>
             </div>
           )}
+          {issue.assigneeName && (
+            <div>
+              <p className="text-muted-foreground text-xs">担当者</p>
+              <p>{issue.assigneeName}</p>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Status transition buttons */}
       <div className="border-t pt-4 mt-4">
         <p className="text-sm font-semibold mb-3">ステータス変更</p>
-        <Tabs
-          value={issue.status}
-          onValueChange={(val) => {
-            if (val !== issue.status) handleStatusChange(val);
-          }}
-        >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger
-              value="OPEN"
-              disabled={statusUpdating || (!transitions.some((t) => t.status === 'OPEN') && issue.status !== 'OPEN')}
+        <div className="flex gap-2 flex-wrap items-center">
+          <Badge variant={STATUS_COLORS[issue.status] ?? 'outline'} className="text-[11px]">
+            現在: {STATUS_LABELS[issue.status]}
+          </Badge>
+          {transitions.map((t) => (
+            <Button
+              key={t.status}
+              variant={t.needsComment ? 'outline' : 'default'}
+              size="sm"
+              disabled={statusUpdating}
+              className={TRANSITION_BUTTON_STYLES[t.status] ?? ''}
+              onClick={() => handleTransitionClick(t)}
             >
-              未対応
-            </TabsTrigger>
-            <TabsTrigger
-              value="IN_PROGRESS"
-              disabled={statusUpdating || (!transitions.some((t) => t.status === 'IN_PROGRESS') && issue.status !== 'IN_PROGRESS')}
-            >
-              対応中
-            </TabsTrigger>
-            <TabsTrigger
-              value="DONE"
-              disabled={
-                statusUpdating ||
-                (!transitions.some((t) => t.status === 'DONE') && issue.status !== 'DONE') ||
-                (issue.status !== 'DONE' && afterPhotos.length === 0)
-              }
-            >
-              完了
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+              {t.label}
+            </Button>
+          ))}
+        </div>
         <div className="mt-3 flex gap-2 flex-wrap">
           <Badge variant="outline" className="text-[11px]">
             是正前: {beforePhotos.length}枚
-          </Badge>
-          <Badge variant={TRANSITION_COLORS[issue.status] ?? 'outline'} className="text-[11px]">
-            現在: {STATUS_LABELS[issue.status]}
           </Badge>
           <Badge variant="outline" className="text-[11px]">
             是正後: {afterPhotos.length}枚
           </Badge>
         </div>
       </div>
+
+      {/* Status change log */}
+      {issue.statusChangeLogs && issue.statusChangeLogs.length > 0 && (
+        <div className="border-t pt-4 mt-4">
+          <p className="text-sm font-semibold mb-3">変更履歴</p>
+          <div className="space-y-2">
+            {issue.statusChangeLogs.map((log) => (
+              <div key={log.logId} className="text-xs border-l-2 pl-3 py-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">
+                    {new Date(log.changedAt).toLocaleString('ja-JP')}
+                  </span>
+                  <span className="font-medium">{log.changedByName}</span>
+                </div>
+                <div>
+                  <Badge variant="outline" className="text-[10px] mr-1">
+                    {STATUS_LABELS[log.fromStatus] ?? log.fromStatus}
+                  </Badge>
+                  →
+                  <Badge variant="outline" className="text-[10px] ml-1">
+                    {STATUS_LABELS[log.toStatus] ?? log.toStatus}
+                  </Badge>
+                </div>
+                {log.comment && (
+                  <p className="text-muted-foreground mt-1 italic">
+                    「{log.comment}」
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="border-t pt-4 mt-4 space-y-6">
         <p className="text-sm font-semibold">写真 ({issue.photos.length} 枚)</p>
@@ -494,6 +636,7 @@ export function IssueDetailPanel({
         </div>
       </div>
 
+      {/* Lightbox dialog */}
       <Dialog
         open={lightboxUrl !== null}
         onOpenChange={(open) => {
@@ -511,6 +654,79 @@ export function IssueDetailPanel({
               className="w-full h-auto max-h-[80vh] object-contain rounded"
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Comment modal (for 否認/再指摘) */}
+      <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>コメントを入力</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="理由を入力してください"
+            rows={4}
+            className="resize-none"
+          />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCommentModalOpen(false)}>
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleCommentSubmit}
+              disabled={!commentText.trim()}
+            >
+              送信
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignee modal */}
+      <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>担当者を割り振る</DialogTitle>
+          </DialogHeader>
+          {usersLoading ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">読み込み中...</p>
+          ) : usersError || users.length === 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">ユーザーIDを入力してください</p>
+              <Input
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                placeholder="ユーザーID"
+                disabled={assigneeUpdating}
+              />
+            </div>
+          ) : (
+            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={assigneeUpdating}>
+              <SelectTrigger>
+                <SelectValue placeholder="担当者を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => (
+                  <SelectItem key={u.userId} value={u.userId}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setAssigneeModalOpen(false)} disabled={assigneeUpdating}>
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleAssigneeSubmit}
+              disabled={!selectedUserId.trim() || assigneeUpdating}
+            >
+              {assigneeUpdating ? '割り振り中...' : '割り振る'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

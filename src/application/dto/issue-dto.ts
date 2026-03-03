@@ -9,6 +9,7 @@ export interface CreateIssueInput {
   title: string;
   description: string;
   issueType?: string;
+  reportedBy: string;
   dueDate: string;
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
@@ -23,7 +24,31 @@ export interface CreateIssueInput {
 export interface UpdateIssueStatusInput {
   issueId: string;
   projectId: string;
-  newStatus: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  newStatus: 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED';
+  comment?: string;
+  changedBy: string;
+}
+
+/**
+ * Issue 担当者割り当て入力
+ */
+export interface AssignIssueInput {
+  issueId: string;
+  projectId: string;
+  assigneeId: string;
+  changedBy: string;
+}
+
+/**
+ * StatusChangeLog 表示用DTO
+ */
+export interface StatusChangeLogDto {
+  logId: string;
+  fromStatus: string;
+  toStatus: string;
+  changedByName: string;
+  comment?: string;
+  changedAt: string;
 }
 
 /**
@@ -34,14 +59,14 @@ export interface IssueListItemDto {
   title: string;
   issueType?: string;
   dueDate: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  status: 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED';
   priority: string;
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
-  reportedBy: number;
+  reportedBy: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +79,9 @@ export interface IssueDetailDto extends IssueListItemDto {
   description: string;
   floorId: string;
   photos: PhotoDto[];
+  assigneeId?: string;
+  assigneeName?: string;
+  statusChangeLogs: StatusChangeLogDto[];
 }
 
 /**

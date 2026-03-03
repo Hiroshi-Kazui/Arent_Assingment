@@ -13,6 +13,7 @@ import {
   type ViewerHit,
 } from '@/app/components/viewer/use-viewer-interaction';
 import { ElementInfoPanel } from '@/app/components/viewer/element-info-panel';
+import { AuthHeader } from '@/app/components/auth-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -48,13 +49,13 @@ interface Issue {
   title: string;
   issueType?: string;
   dueDate: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  status: 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED';
   locationType: 'dbId' | 'worldPosition';
   dbId?: string;
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
-  reportedBy: number;
+  reportedBy: string;
 }
 
 interface Project {
@@ -77,19 +78,24 @@ interface Floor {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  POINT_OUT: '指摘',
   OPEN: '未対応',
   IN_PROGRESS: '対応中',
   DONE: '完了',
+  CONFIRMED: '承認済',
 };
 
 const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  POINT_OUT: 'outline',
   OPEN: 'destructive',
   IN_PROGRESS: 'default',
   DONE: 'secondary',
+  CONFIRMED: 'default',
 };
 
 const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
   DONE: 'bg-[#22c55e] text-white border-transparent hover:bg-[#16a34a]',
+  CONFIRMED: 'bg-[#8B5CF6] text-white border-transparent hover:bg-[#7C3AED]',
 };
 
 const ISSUE_TYPES = ['quality', 'safety', 'construction', 'design'];
@@ -429,7 +435,7 @@ export default function ViewerPage({ params }: PageProps) {
             const issueDueDate = new Date(issue.dueDate);
             issueDueDate.setHours(0, 0, 0, 0);
             const isOverdue =
-              issue.status !== 'DONE' && issueDueDate.getTime() <= today.getTime();
+              issue.status !== 'DONE' && issue.status !== 'CONFIRMED' && issueDueDate.getTime() <= today.getTime();
 
             return (
             <button
@@ -486,7 +492,9 @@ export default function ViewerPage({ params }: PageProps) {
           <span className="opacity-50">/</span>
           <span className="text-foreground/80">{project?.name ?? id}</span>
         </div>
-
+        <div className="ml-auto shrink-0">
+          <AuthHeader />
+        </div>
       </header>
 
       {/* Main content */}

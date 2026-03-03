@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { CreateIssueHandler } from './create-issue';
 import { UpdateIssueStatusHandler } from './update-issue-status';
+import { AssignIssueHandler } from './assign-issue';
 import { PrismaIssueRepository } from '../../infrastructure/prisma/prisma-issue-repository';
 import { PrismaPhotoRepository } from '../../infrastructure/prisma/prisma-photo-repository';
+import { PrismaStatusChangeLogRepository } from '../../infrastructure/prisma/prisma-status-change-log-repository';
 import { listIssues } from '../queries/list-issues';
 import { getIssueDetail } from '../queries/get-issue-detail';
 import { IssueId } from '../../domain/models/issue';
@@ -14,21 +16,52 @@ import prisma from '../../infrastructure/prisma/prisma-client';
 describe('Issue Commands - 統合テスト', () => {
   const issueRepository = new PrismaIssueRepository();
   const photoRepository = new PrismaPhotoRepository();
+  const statusChangeLogRepository = new PrismaStatusChangeLogRepository();
   const createIssueHandler = new CreateIssueHandler(issueRepository);
   const updateStatusHandler = new UpdateIssueStatusHandler(
     issueRepository,
-    photoRepository
+    photoRepository,
+    statusChangeLogRepository
+  );
+  const assignIssueHandler = new AssignIssueHandler(
+    issueRepository,
+    statusChangeLogRepository
   );
 
   const projectId = ProjectId.create(
     '22222222-2222-2222-2222-222222222222'
   );
   const floorId = '33333333-3333-3333-3333-333333333331';
+  const testUserId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const testOrgId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 
   let createdIssueId: string;
 
   // テスト用 Issue を作成
   beforeAll(async () => {
+    await prisma.organization.upsert({
+      where: { organization_id: testOrgId },
+      update: {},
+      create: {
+        organization_id: testOrgId,
+        name: 'テスト組織',
+        type: 'GENERAL_CONTRACTOR',
+      },
+    });
+
+    await prisma.user.upsert({
+      where: { user_id: testUserId },
+      update: {},
+      create: {
+        user_id: testUserId,
+        organization_id: testOrgId,
+        name: 'テストユーザー',
+        email: 'test-commands@example.com',
+        password_hash: 'dummy',
+        role: 'WORKER',
+      },
+    });
+
     await prisma.building.upsert({
       where: { building_id: '11111111-1111-1111-1111-111111111111' },
       update: {},
@@ -72,6 +105,7 @@ describe('Issue Commands - 統合テスト', () => {
       title: 'テスト指摘',
       description: 'テスト用の指摘です',
       issueType: 'structural',
+      reportedBy: testUserId,
       dueDate: '2026-12-31',
       locationType: 'worldPosition',
       worldPositionX: 10.5,
@@ -80,11 +114,25 @@ describe('Issue Commands - 統合テスト', () => {
     };
 
     createdIssueId = await createIssueHandler.execute(input);
+
+    // POINT_OUT → OPEN（担当者割当）
+    await assignIssueHandler.execute({
+      issueId: createdIssueId,
+      projectId: projectId,
+      assigneeId: testUserId,
+      changedBy: testUserId,
+    });
   });
 
   // テスト後のクリーンアップ
   afterAll(async () => {
     if (createdIssueId) {
+      await prisma.statusChangeLog.deleteMany({
+        where: { issue_id: createdIssueId },
+      });
+      await prisma.photo.deleteMany({
+        where: { issue_id: createdIssueId },
+      });
       await prisma.issue.delete({
         where: { issue_id: createdIssueId },
       });
@@ -112,6 +160,7 @@ describe('Issue Commands - 統合テスト', () => {
         issueId: createdIssueId,
         projectId: projectId,
         newStatus: 'IN_PROGRESS',
+        changedBy: testUserId,
       });
 
       const detail = await getIssueDetail(
@@ -137,6 +186,7 @@ describe('Issue Commands - 統合テスト', () => {
         issueId: createdIssueId,
         projectId: projectId,
         newStatus: 'DONE',
+        changedBy: testUserId,
       });
 
       const detail = await getIssueDetail(
@@ -151,6 +201,7 @@ describe('Issue Commands - 統合テスト', () => {
         issueId: createdIssueId,
         projectId: projectId,
         newStatus: 'IN_PROGRESS',
+        changedBy: testUserId,
       });
 
       const detail = await getIssueDetail(
@@ -165,6 +216,7 @@ describe('Issue Commands - 統合テスト', () => {
         issueId: createdIssueId,
         projectId: projectId,
         newStatus: 'OPEN',
+        changedBy: testUserId,
       });
 
       const detail = await getIssueDetail(
@@ -183,6 +235,7 @@ describe('Issue Commands - 統合テスト', () => {
           issueId: createdIssueId,
           projectId: projectId,
           newStatus: 'DONE',
+          changedBy: testUserId,
         });
       };
 

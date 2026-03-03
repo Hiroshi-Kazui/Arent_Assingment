@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AuthHeader } from '@/app/components/auth-header';
 
 interface Project {
   projectId: string;
@@ -65,8 +66,13 @@ export default function ProjectListPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b px-4 sm:px-6 py-4 sticky top-0 z-10 shadow-sm">
-        <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
-        <p className="text-sm text-muted-foreground mt-1">プロジェクト一覧</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
+            <p className="text-sm text-muted-foreground mt-1">プロジェクト一覧</p>
+          </div>
+          <AuthHeader />
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">

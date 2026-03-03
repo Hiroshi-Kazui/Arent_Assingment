@@ -8,12 +8,21 @@ import { PrismaProjectRepository } from '../infrastructure/prisma/prisma-project
 import { PrismaBuildingRepository } from '../infrastructure/prisma/prisma-building-repository';
 import { PrismaFloorRepository } from '../infrastructure/prisma/prisma-floor-repository';
 import { PrismaPhotoRepository } from '../infrastructure/prisma/prisma-photo-repository';
+import { PrismaStatusChangeLogRepository } from '../infrastructure/prisma/prisma-status-change-log-repository';
+import { PrismaOrganizationRepository } from '../infrastructure/prisma/prisma-organization-repository';
 import { MinioPhotoStorage } from '../infrastructure/minio/minio-photo-storage';
 import { ApsTokenProvider } from '../infrastructure/aps/aps-token-provider';
 
 import { CreateIssueHandler } from './commands/create-issue';
 import { UpdateIssueStatusHandler } from './commands/update-issue-status';
 import { AddPhotoHandler } from './commands/add-photo';
+import { AssignIssueHandler } from './commands/assign-issue';
+import { CreateOrganizationHandler } from './commands/create-organization';
+import { UpdateOrganizationHandler } from './commands/update-organization';
+import { DeleteOrganizationHandler } from './commands/delete-organization';
+import { CreateUserHandler } from './commands/create-user';
+import { UpdateUserHandler } from './commands/update-user';
+import { DeactivateUserHandler } from './commands/deactivate-user';
 
 // ApsTokenProvider はキャッシュを内部で持つため、シングルトンとして保持
 // リクエストごとに新規インスタンスを生成するとキャッシュが無効になる
@@ -40,6 +49,8 @@ export function getRepositories() {
     building: new PrismaBuildingRepository(),
     floor: new PrismaFloorRepository(),
     photo: new PrismaPhotoRepository(),
+    statusChangeLog: new PrismaStatusChangeLogRepository(),
+    organization: new PrismaOrganizationRepository(),
   };
 }
 
@@ -71,12 +82,19 @@ export function getCommandHandlers() {
 
   return {
     createIssue: new CreateIssueHandler(repos.issue),
-    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue, repos.photo),
+    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue, repos.photo, repos.statusChangeLog),
     addPhoto: new AddPhotoHandler(
       repos.issue,
       storages.photoStorage,
       repos.photo
     ),
+    assignIssue: new AssignIssueHandler(repos.issue, repos.statusChangeLog),
+    createOrganization: new CreateOrganizationHandler(repos.organization),
+    updateOrganization: new UpdateOrganizationHandler(repos.organization),
+    deleteOrganization: new DeleteOrganizationHandler(repos.organization),
+    createUser: new CreateUserHandler(),
+    updateUser: new UpdateUserHandler(),
+    deactivateUser: new DeactivateUserHandler(),
   };
 }
 

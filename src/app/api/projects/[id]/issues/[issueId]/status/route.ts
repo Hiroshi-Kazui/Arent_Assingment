@@ -10,7 +10,7 @@ interface Params {
 /**
  * PATCH /api/projects/[id]/issues/[issueId]/status
  * Issue のステータスを更新
- * リクエストボディ: { status: "Open" | "InProgress" | "Done" }
+ * リクエストボディ: { status: string, comment?: string, changedBy?: string }
  */
 export async function PATCH(
   request: Request,
@@ -29,20 +29,24 @@ export async function PATCH(
     }
 
     const inputStatus = String(body.status);
-    const statusMap: Record<string, 'OPEN' | 'IN_PROGRESS' | 'DONE'> = {
+    const statusMap: Record<string, 'POINT_OUT' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CONFIRMED'> = {
+      POINT_OUT: 'POINT_OUT',
       OPEN: 'OPEN',
       IN_PROGRESS: 'IN_PROGRESS',
       DONE: 'DONE',
+      CONFIRMED: 'CONFIRMED',
+      PointOut: 'POINT_OUT',
       Open: 'OPEN',
       InProgress: 'IN_PROGRESS',
       Done: 'DONE',
+      Confirmed: 'CONFIRMED',
     };
     const normalizedStatus = statusMap[inputStatus];
     if (!normalizedStatus) {
       return NextResponse.json(
         {
           error:
-            'Invalid status. Must be one of: Open, InProgress, Done',
+            'Invalid status. Must be one of: PointOut, Open, InProgress, Done, Confirmed',
         },
         { status: 400 }
       );
@@ -53,6 +57,8 @@ export async function PATCH(
       issueId,
       projectId: id,
       newStatus: normalizedStatus,
+      comment: body.comment ?? undefined,
+      changedBy: body.changedBy ?? '',
     });
 
     return successResponse({
