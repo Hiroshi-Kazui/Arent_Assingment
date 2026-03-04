@@ -1,27 +1,37 @@
 import { IssueListItemDto } from '../dto/issue-dto';
 import { ProjectId } from '../../domain/models/project';
 import { FloorId } from '../../domain/models/floor';
+import { PaginationParams, PaginatedResult, buildPaginatedResult } from '../dto/pagination';
 import prisma from '../../infrastructure/prisma/prisma-client';
 
 /**
- * 指定 Project の指摘一覧を取得
+ * 指定 Project の指摘一覧を取得（ページネーション対応）
  * floorId でフィルタ対応
  */
 export async function listIssues(
   projectId: ProjectId,
-  floorId?: FloorId
-): Promise<IssueListItemDto[]> {
+  floorId?: FloorId,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<IssueListItemDto>> {
   const where: { project_id: string; floor_id?: string } = { project_id: projectId };
   if (floorId) {
     where.floor_id = floorId;
   }
 
-  const issues = await prisma.issue.findMany({
-    where,
-    orderBy: { due_date: 'asc' },
-  });
+  const skip = pagination ? (pagination.page - 1) * pagination.limit : undefined;
+  const take = pagination?.limit;
 
-  return issues.map((issue) => ({
+  const [issues, totalCount] = await Promise.all([
+    prisma.issue.findMany({
+      where,
+      orderBy: { due_date: 'asc' },
+      skip,
+      take,
+    }),
+    prisma.issue.count({ where }),
+  ]);
+
+  const items = issues.map((issue) => ({
     issueId: issue.issue_id,
     title: issue.title,
     issueType: issue.issue_type ?? undefined,
@@ -43,4 +53,7 @@ export async function listIssues(
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
   }));
+
+  const params = pagination ?? { page: 1, limit: totalCount || 1 };
+  return buildPaginatedResult(items, totalCount, params);
 }

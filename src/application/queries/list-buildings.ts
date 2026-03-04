@@ -1,15 +1,23 @@
 import { BuildingDto } from '../dto/building-dto';
+import { PaginationParams, PaginatedResult, buildPaginatedResult } from '../dto/pagination';
 import prisma from '../../infrastructure/prisma/prisma-client';
 
 /**
- * すべての Building 一覧を取得
+ * Building 一覧を取得（ページネーション対応）
  */
-export async function listBuildings(): Promise<BuildingDto[]> {
-  const buildings = await prisma.building.findMany({
-    orderBy: { created_at: 'desc' },
-  });
+export async function listBuildings(
+  pagination: PaginationParams
+): Promise<PaginatedResult<BuildingDto>> {
+  const [buildings, totalCount] = await Promise.all([
+    prisma.building.findMany({
+      orderBy: { created_at: 'desc' },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
+    }),
+    prisma.building.count(),
+  ]);
 
-  return buildings.map((building) => ({
+  const items = buildings.map((building) => ({
     buildingId: building.building_id,
     name: building.name,
     address: building.address,
@@ -17,4 +25,6 @@ export async function listBuildings(): Promise<BuildingDto[]> {
     longitude: building.longitude.toString(),
     modelUrn: building.model_urn,
   }));
+
+  return buildPaginatedResult(items, totalCount, pagination);
 }
