@@ -1,0 +1,61 @@
+graph TB
+    subgraph Presentation["Presentation Layer (src/app/)"]
+        P1["Next.js Pages\n(login, projects, viewer, issues)"]
+        P2["React Components\n(IssueMarkers, ApsViewer, etc.)"]
+        P3["API Route Handlers\n(src/app/api/)"]
+        P4["APS Viewer SDK\n(Forge Viewer)"]
+    end
+
+    subgraph Application["Application Layer (src/application/)"]
+        A1["Command Handlers\n(CreateIssue, UpdateIssueStatus,\nAddPhoto, AssignIssue, etc.)"]
+        A2["Query Handlers\n(ListProjects, ListIssues,\nGetIssueDetail, etc.)"]
+        A3["DTOs\n(Request / Response)"]
+    end
+
+    subgraph Domain["Domain Layer (src/domain/) ★ No external deps"]
+        D1["Issue Aggregate\n(State transitions as methods:\nstartWork, complete, confirm,\nrejectCompletion, reissue, etc.)"]
+        D2["Value Objects\n(Location: DbId | WorldPosition\nCoordinate: lat/lng)"]
+        D3["Repository Interfaces\n(IssueRepository, PhotoStorage,\nViewerTokenProvider, etc.)"]
+        D4["Other Entities\n(Organization, User, Building,\nFloor, Project, Photo,\nStatusChangeLog)"]
+        D5["Domain Errors\n(InvalidStatusTransitionError)"]
+    end
+
+    subgraph Infrastructure["Infrastructure Layer (src/infrastructure/)"]
+        I1["Prisma Repositories\n(PrismaIssueRepository,\nPrismaProjectRepository, etc.)"]
+        I2["MinIO PhotoStorage\n(implements PhotoStorage)"]
+        I3["APS TokenProvider\n(implements ViewerTokenProvider)"]
+        I4["NextAuth Provider\n(credentials: email + password)"]
+        I5["Prisma Schema\n(prisma/schema.prisma)"]
+    end
+
+    subgraph External["External Systems"]
+        E1[("PostgreSQL 16")]
+        E2["MinIO\n(S3-compatible)"]
+        E3["APS API\n(Autodesk)"]
+    end
+
+    P3 --> A1
+    P3 --> A2
+    P1 --> P3
+    P2 --> P4
+
+    A1 --> D1
+    A1 --> D3
+    A2 --> D3
+    A1 --> A3
+    A2 --> A3
+
+    I1 --> D3
+    I2 --> D3
+    I3 --> D3
+
+    I1 --> I5
+    I5 --> E1
+    I2 --> E2
+    I3 --> E3
+    I4 --> E1
+
+    style Domain fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px
+    style Infrastructure fill:#d4edda,stroke:#28a745
+    style Application fill:#d1ecf1,stroke:#17a2b8
+    style Presentation fill:#f8d7da,stroke:#dc3545

@@ -1,0 +1,27 @@
+graph LR
+    subgraph src/app ["Presentation (src/app/)"]
+        PR["Pages & Components\nAPI Route Handlers"]
+    end
+
+    subgraph src/application ["Application (src/application/)"]
+        AP["Commands & Queries\nDTO"]
+    end
+
+    subgraph src/domain ["Domain (src/domain/) ★"]
+        DM["Aggregates & Entities\nValue Objects"]
+        RI["Repository Interfaces\nPhotoStorage\nViewerTokenProvider"]
+    end
+
+    subgraph src/infrastructure ["Infrastructure (src/infrastructure/)"]
+        IN["Prisma Repositories\nMinioPhotoStorage\nApsViewerTokenProvider\nNextAuth Provider"]
+    end
+
+    PR -->|"depends on"| AP
+    AP -->|"depends on"| DM
+    AP -->|"uses interface"| RI
+    IN -->|"implements interface\n(Dependency Inversion)"| RI
+
+    note["Domain has ZERO\nexternal dependencies.\nNo Prisma, No MinIO,\nNo Next.js imports."]
+
+    style src/domain fill:#fff3cd,stroke:#f0ad4e,stroke-width:3px
+    style note fill:#f8f9fa,stroke:#6c757d,color:#666
