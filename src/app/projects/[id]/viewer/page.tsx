@@ -153,16 +153,33 @@ export default function ViewerPage({ params }: PageProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [formFiles, setFormFiles] = useState<FileList | null>(null);
   const [formFloorId, setFormFloorId] = useState('');
+  const [formAssigneeId, setFormAssigneeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [assignableUsers, setAssignableUsers] = useState<Array<{ userId: string; name: string; activeIssueCount: number }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const buildIssuesUrl = () => {
+    const params = new URLSearchParams();
+    if (selectedFloorId) params.set('floorId', selectedFloorId);
+    if (statusFilter.size > 0) params.set('status', [...statusFilter].join(','));
+    const qs = params.toString();
+    return `/api/projects/${id}/issues${qs ? `?${qs}` : ''}`;
+  };
+
+  // 担当者候補取得
+  useEffect(() => {
+    fetch('/api/assignable-users')
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setAssignableUsers)
+      .catch(() => {});
+  }, []);
 
   // 初期データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const issuesUrl = selectedFloorId
-          ? `/api/projects/${id}/issues?floorId=${selectedFloorId}`
-          : `/api/projects/${id}/issues`;
+        const issuesUrl = buildIssuesUrl();
         const projectRes = await fetch(`/api/projects/${id}`);
         if (projectRes.ok) {
           const projectData: Project = await projectRes.json();
@@ -193,7 +210,7 @@ export default function ViewerPage({ params }: PageProps) {
       }
     };
     fetchData();
-  }, [id, selectedFloorId]);
+  }, [id, selectedFloorId, statusFilter]);
 
   useEffect(() => {
     if (!viewer || !highlightId || issues.length === 0) {
@@ -232,9 +249,7 @@ export default function ViewerPage({ params }: PageProps) {
 
   // 指摘一覧リフレッシュ
   const refreshIssues = async () => {
-    const url = selectedFloorId
-      ? `/api/projects/${id}/issues?floorId=${selectedFloorId}`
-      : `/api/projects/${id}/issues`;
+    const url = buildIssuesUrl();
     const res = await fetch(url);
     if (res.ok) {
       const json = await res.json();
@@ -265,7 +280,7 @@ export default function ViewerPage({ params }: PageProps) {
       }
     }
 
-    return selectedFloorId ?? '';
+    return selectedFloorId ?? floors[0]?.floorId ?? '';
   };
 
   // 導線A: ダブルクリック/長押しで即時登録
@@ -332,6 +347,9 @@ export default function ViewerPage({ params }: PageProps) {
         fd.append('worldPositionY', String(selectedWorldPosition?.y ?? 0));
         fd.append('worldPositionZ', String(selectedWorldPosition?.z ?? 0));
       }
+      if (formAssigneeId && formAssigneeId !== '__none__') {
+        fd.append('assigneeId', formAssigneeId);
+      }
       if (formFiles && formFiles.length > 0) {
         fd.append('photoPhase', 'BEFORE');
         for (const file of Array.from(formFiles)) {
@@ -356,6 +374,7 @@ export default function ViewerPage({ params }: PageProps) {
       setFormDueDate(undefined);
       setFormFiles(null);
       setFormFloorId('');
+      setFormAssigneeId('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setShowForm(false);
       setSelectedDbId(null);
@@ -475,16 +494,6 @@ export default function ViewerPage({ params }: PageProps) {
     </ScrollArea>
   );
 
-  useEffect(() => {
-    if (!floorMappingReady || !selectedFloorId) {
-      return;
-    }
-
-    const current = floors.find((floor) => floor.floorId === selectedFloorId);
-    if (current && !floorsWithElements.has(current.floorNumber)) {
-      handleFloorChange('');
-    }
-  }, [floorMappingReady, selectedFloorId, floors, floorsWithElements]);
 
   return (
     <div className="flex flex-col h-screen bg-background pb-[60px] sm:pb-0">
@@ -536,7 +545,7 @@ export default function ViewerPage({ params }: PageProps) {
             </div>
           )}
 
-          {floorMappingReady && availableFloors.length > 0 && (
+          {floors.length > 0 && (
             <div className="absolute bottom-16 left-4 z-20 rounded-lg border bg-background/90 shadow-sm p-1.5 flex flex-col gap-1">
               <button
                 type="button"
@@ -548,7 +557,7 @@ export default function ViewerPage({ params }: PageProps) {
               >
                 全フロア
               </button>
-              {availableFloors.map((floor) => (
+              {floors.map((floor) => (
                 <button
                   key={floor.floorId}
                   type="button"
@@ -598,6 +607,28 @@ export default function ViewerPage({ params }: PageProps) {
             </h2>
             <Badge variant="secondary">{issues.length} 件</Badge>
           </div>
+          <div className="px-4 py-2 border-b flex flex-wrap gap-1">
+            {(['POINT_OUT', 'OPEN', 'IN_PROGRESS', 'DONE', 'CONFIRMED'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setStatusFilter((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(s)) { next.delete(s); } else { next.add(s); }
+                    return next;
+                  });
+                }}
+                className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                  statusFilter.has(s)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                {STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
           {issueListContent}
         </aside>
       </div>
@@ -646,7 +677,12 @@ export default function ViewerPage({ params }: PageProps) {
       >
         <DialogContent className="sm:max-w-lg overflow-hidden flex flex-col max-h-[90vh] p-0 gap-0 border-border">
           <DialogHeader className="p-6 pb-4 border-b bg-muted/20 shrink-0">
-            <DialogTitle>新しい指摘を追加</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              新しい指摘を追加
+              <Badge variant="outline" className="text-xs font-normal">
+                {selectedDbId !== null ? '部材指摘' : '空間指摘'}
+              </Badge>
+            </DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="flex-1 p-6">
@@ -723,6 +759,27 @@ export default function ViewerPage({ params }: PageProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {assignableUsers.length > 0 && (
+                <div>
+                  <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                    担当者
+                  </label>
+                  <Select value={formAssigneeId} onValueChange={setFormAssigneeId} disabled={submitting}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="担当者を選択（任意）" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">未割当</SelectItem>
+                      {assignableUsers.map((u) => (
+                        <SelectItem key={u.userId} value={u.userId}>
+                          {u.name} ({u.activeIssueCount})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
