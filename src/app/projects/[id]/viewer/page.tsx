@@ -173,7 +173,8 @@ export default function ViewerPage({ params }: PageProps) {
             `/api/buildings/${projectData.buildingId}/floors`
           );
           if (floorsRes.ok) {
-            const floorsData: Floor[] = await floorsRes.json();
+            const floorsJson = await floorsRes.json();
+            const floorsData: Floor[] = floorsJson.items ?? floorsJson;
             setFloors(floorsData.sort((a, b) => b.floorNumber - a.floorNumber));
           }
         }
@@ -181,7 +182,8 @@ export default function ViewerPage({ params }: PageProps) {
         // 指摘一覧取得
         const issuesRes = await fetch(issuesUrl);
         if (issuesRes.ok) {
-          const issuesData: Issue[] = await issuesRes.json();
+          const issuesJson = await issuesRes.json();
+          const issuesData: Issue[] = issuesJson.items ?? issuesJson;
           setIssues(issuesData);
         }
       } catch (err) {
@@ -234,7 +236,10 @@ export default function ViewerPage({ params }: PageProps) {
       ? `/api/projects/${id}/issues?floorId=${selectedFloorId}`
       : `/api/projects/${id}/issues`;
     const res = await fetch(url);
-    if (res.ok) setIssues(await res.json());
+    if (res.ok) {
+      const json = await res.json();
+      setIssues(json.items ?? json);
+    }
   };
 
   // マーカークリック → 詳細モーダル表示

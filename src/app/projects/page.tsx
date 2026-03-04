@@ -37,7 +37,7 @@ export default function ProjectListPage() {
     fetch('/api/projects')
       .then((r) => r.json())
       .then((data) => {
-        setProjects(Array.isArray(data) ? data : []);
+        setProjects(Array.isArray(data) ? data : data.items ?? []);
         setLoading(false);
       })
       .catch((err) => {
