@@ -56,10 +56,10 @@ export async function POST(
       );
     }
 
-    if (!['BEFORE', 'AFTER'].includes(photoPhase)) {
+    if (!['BEFORE', 'AFTER', 'REJECTION'].includes(photoPhase)) {
       return NextResponse.json(
         {
-          error: `Invalid photoPhase: ${photoPhase}. Must be BEFORE or AFTER`,
+          error: `Invalid photoPhase: ${photoPhase}. Must be BEFORE, AFTER, or REJECTION`,
         },
         { status: 400 }
       );
@@ -87,7 +87,7 @@ export async function POST(
         file: buffer,
         fileName: file.name,
         contentType: file.type,
-        photoPhase: photoPhase as 'BEFORE' | 'AFTER',
+        photoPhase: photoPhase as 'BEFORE' | 'AFTER' | 'REJECTION',
       });
 
       uploadedPhotos.push({

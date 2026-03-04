@@ -75,27 +75,23 @@ interface Floor {
   floorId: string;
   name: string;
   floorNumber: number;
+  elevation: number | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  POINT_OUT: '指摘',
+  POINT_OUT: '未割当',
   OPEN: '未対応',
   IN_PROGRESS: '対応中',
   DONE: '完了',
   CONFIRMED: '承認済',
 };
 
-const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  POINT_OUT: 'outline',
-  OPEN: 'destructive',
-  IN_PROGRESS: 'default',
-  DONE: 'secondary',
-  CONFIRMED: 'default',
-};
-
-const STATUS_BADGE_CLASSNAMES: Record<string, string> = {
-  DONE: 'bg-[#22c55e] text-white border-transparent hover:bg-[#16a34a]',
-  CONFIRMED: 'bg-[#8B5CF6] text-white border-transparent hover:bg-[#7C3AED]',
+const STATUS_INLINE_STYLES: Record<string, React.CSSProperties> = {
+  POINT_OUT: { backgroundColor: '#E53935', color: '#fff', borderColor: 'transparent' },
+  OPEN: { backgroundColor: '#757575', color: '#fff', borderColor: 'transparent' },
+  IN_PROGRESS: { backgroundColor: '#1E88E5', color: '#fff', borderColor: 'transparent' },
+  DONE: { backgroundColor: '#43A047', color: '#fff', borderColor: 'transparent' },
+  CONFIRMED: { backgroundColor: '#00695C', color: '#fff', borderColor: 'transparent' },
 };
 
 const ISSUE_TYPES = ['quality', 'safety', 'construction', 'design'];
@@ -114,6 +110,13 @@ const INVALID_MODEL_URNS = new Set([
 
 function isValidModelUrn(value: string | undefined | null): value is string {
   return !!value && !INVALID_MODEL_URNS.has(value.trim());
+}
+
+async function fetchFloors(buildingId: string): Promise<Floor[]> {
+  const res = await fetch(`/api/buildings/${buildingId}/floors`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.items ?? json;
 }
 
 export default function ViewerPage({ params }: PageProps) {
@@ -186,14 +189,25 @@ export default function ViewerPage({ params }: PageProps) {
           setProject(projectData);
 
           // フロア一覧取得
-          const floorsRes = await fetch(
-            `/api/buildings/${projectData.buildingId}/floors`
-          );
-          if (floorsRes.ok) {
-            const floorsJson = await floorsRes.json();
-            const floorsData: Floor[] = floorsJson.items ?? floorsJson;
-            setFloors(floorsData.sort((a, b) => b.floorNumber - a.floorNumber));
+          let floorsData = await fetchFloors(projectData.buildingId);
+
+          // フロアデータがなければ APS メタデータから Level 名を同期
+          if (floorsData.length === 0) {
+            console.log('[ViewerPage] No floors, syncing level names from APS metadata...');
+            try {
+              const syncRes = await fetch(
+                `/api/buildings/${projectData.buildingId}/sync-levels`
+              );
+              if (syncRes.ok) {
+                floorsData = await fetchFloors(projectData.buildingId);
+                console.log(`[ViewerPage] Synced ${floorsData.length} floors`);
+              }
+            } catch (e) {
+              console.warn('[ViewerPage] sync-levels failed:', e);
+            }
           }
+
+          setFloors(floorsData.sort((a, b) => b.floorNumber - a.floorNumber));
         }
 
         // 指摘一覧取得
@@ -419,6 +433,7 @@ export default function ViewerPage({ params }: PageProps) {
       viewer,
       selectedFloorNumber,
       floors,
+      buildingId: project?.buildingId ?? null,
     });
   const availableFloors = useMemo(
     () =>
@@ -473,8 +488,9 @@ export default function ViewerPage({ params }: PageProps) {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <p className={`text-sm font-medium transition-colors line-clamp-2 pr-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
                 <Badge
-                  variant={STATUS_COLORS[issue.status] ?? 'outline'}
-                  className={`shrink-0 w-[64px] justify-center text-center text-[10px] whitespace-nowrap ${STATUS_BADGE_CLASSNAMES[issue.status] ?? ''}`}
+                  variant="outline"
+                  className="shrink-0 w-[64px] justify-center text-center text-[10px] whitespace-nowrap"
+                  style={STATUS_INLINE_STYLES[issue.status]}
                 >
                   {STATUS_LABELS[issue.status]}
                 </Badge>
@@ -621,9 +637,10 @@ export default function ViewerPage({ params }: PageProps) {
                 }}
                 className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
                   statusFilter.has(s)
-                    ? 'bg-primary text-primary-foreground border-primary'
+                    ? 'text-white border-transparent'
                     : 'hover:bg-muted'
                 }`}
+                style={statusFilter.has(s) ? { backgroundColor: STATUS_INLINE_STYLES[s]?.backgroundColor } : undefined}
               >
                 {STATUS_LABELS[s]}
               </button>

@@ -12,6 +12,7 @@ interface Project {
   buildingId: string;
   status: string;
   issueCount: number;
+  progressRate: number;
   startDate: string;
   dueDate: string;
 }
@@ -112,6 +113,22 @@ export default function ProjectListPage() {
                           <span>期限:</span> <span className="text-foreground/80">{new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
                         </span>
                       )}
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                        <span>進捗</span>
+                        <span className="font-mono">{project.progressRate}%</span>
+                      </div>
+                      <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${project.progressRate}%`,
+                            backgroundColor: project.progressRate >= 80 ? '#22c55e' : project.progressRate >= 40 ? '#eab308' : '#ef4444',
+                          }}
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

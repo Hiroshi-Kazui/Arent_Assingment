@@ -75,19 +75,19 @@ interface UserOption {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  POINT_OUT: '指摘',
+  POINT_OUT: '未割当',
   OPEN: '未対応',
   IN_PROGRESS: '対応中',
   DONE: '完了',
   CONFIRMED: '承認済',
 };
 
-const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  POINT_OUT: 'outline',
-  OPEN: 'destructive',
-  IN_PROGRESS: 'default',
-  DONE: 'secondary',
-  CONFIRMED: 'default',
+const STATUS_INLINE_STYLES: Record<string, React.CSSProperties> = {
+  POINT_OUT: { backgroundColor: '#E53935', color: '#fff', borderColor: 'transparent' },
+  OPEN: { backgroundColor: '#757575', color: '#fff', borderColor: 'transparent' },
+  IN_PROGRESS: { backgroundColor: '#1E88E5', color: '#fff', borderColor: 'transparent' },
+  DONE: { backgroundColor: '#43A047', color: '#fff', borderColor: 'transparent' },
+  CONFIRMED: { backgroundColor: '#00695C', color: '#fff', borderColor: 'transparent' },
 };
 
 const ISSUE_TYPE_LABELS: Record<string, string> = {
@@ -121,9 +121,14 @@ const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsCo
 const TRANSITION_BUTTON_STYLES: Record<string, string> = {
   IN_PROGRESS: '',
   DONE: '',
-  CONFIRMED: 'bg-purple-600 hover:bg-purple-700 text-white',
-  OPEN: 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300',
+  CONFIRMED: 'text-white',
+  OPEN: 'text-white',
   ASSIGN: '',
+};
+
+const TRANSITION_BUTTON_INLINE_STYLES: Record<string, React.CSSProperties> = {
+  CONFIRMED: { backgroundColor: '#00695C' },
+  OPEN: { backgroundColor: '#757575' },
 };
 
 const CAROUSEL_LAYOUT_CLASS = 'w-full px-10 sm:px-11';
@@ -183,6 +188,12 @@ export function IssueDetailPanel({
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [commentModalTarget, setCommentModalTarget] = useState<string>('');
   const [commentText, setCommentText] = useState('');
+
+  // Title editing state
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleSaving, setTitleSaving] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Assignee modal state
   const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
@@ -421,6 +432,31 @@ export function IssueDetailPanel({
         new Date().setHours(0, 0, 0, 0)
     : false;
 
+  const userRole = session?.user?.role;
+  const canEditTitle = userRole === 'ADMIN' || userRole === 'SUPERVISOR';
+
+  const handleTitleSave = async () => {
+    if (!issue || !titleDraft.trim() || titleDraft.trim() === issue.title) {
+      setEditingTitle(false);
+      return;
+    }
+    setTitleSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: titleDraft.trim() }),
+      });
+      if (!res.ok) throw new Error('Failed to update title');
+      setEditingTitle(false);
+      onIssueUpdated?.();
+    } catch {
+      alert('タイトルの更新に失敗しました');
+    } finally {
+      setTitleSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -440,7 +476,7 @@ export function IssueDetailPanel({
   return (
     <div className="pb-6">
       <div className="flex flex-wrap items-center gap-2 pb-4">
-        <Badge variant={STATUS_COLORS[issue.status] ?? 'outline'}>
+        <Badge variant="outline" style={STATUS_INLINE_STYLES[issue.status]}>
           {STATUS_LABELS[issue.status]}
         </Badge>
         {issue.issueType && (
@@ -453,7 +489,57 @@ export function IssueDetailPanel({
       <div className="border-t pt-4 space-y-4 text-sm">
         <div>
           <p className="text-muted-foreground mb-1">タイトル</p>
-          <p className="font-medium">{issue.title}</p>
+          {editingTitle ? (
+            <div className="flex gap-2 items-center">
+              <Input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                disabled={titleSaving}
+                className="h-8 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTitleSave();
+                  if (e.key === 'Escape') setEditingTitle(false);
+                }}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2 text-xs"
+                disabled={titleSaving || !titleDraft.trim()}
+                onClick={handleTitleSave}
+              >
+                保存
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2 text-xs"
+                disabled={titleSaving}
+                onClick={() => setEditingTitle(false)}
+              >
+                取消
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="font-medium">{issue.title}</p>
+              {canEditTitle && (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="タイトルを編集"
+                  onClick={() => {
+                    setTitleDraft(issue.title);
+                    setEditingTitle(true);
+                    setTimeout(() => titleInputRef.current?.focus(), 0);
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div>
           <p className="text-muted-foreground mb-1">説明</p>
@@ -470,7 +556,7 @@ export function IssueDetailPanel({
           </div>
           <div>
             <p className="text-muted-foreground text-xs">位置種別</p>
-            <p>{issue.locationType}</p>
+            <p>{issue.locationType === 'dbId' ? '部材情報' : '空間情報'}</p>
           </div>
           {issue.dbId && (
             <div>
@@ -493,7 +579,7 @@ export function IssueDetailPanel({
       <div className="border-t pt-4 mt-4">
         <p className="text-sm font-semibold mb-3">ステータス変更</p>
         <div className="flex gap-2 flex-wrap items-center">
-          <Badge variant={STATUS_COLORS[issue.status] ?? 'outline'} className="text-[11px]">
+          <Badge variant="outline" className="text-[11px]" style={STATUS_INLINE_STYLES[issue.status]}>
             現在: {STATUS_LABELS[issue.status]}
           </Badge>
           {transitions.map((t) => (
@@ -503,6 +589,7 @@ export function IssueDetailPanel({
               size="sm"
               disabled={statusUpdating}
               className={TRANSITION_BUTTON_STYLES[t.status] ?? ''}
+              style={TRANSITION_BUTTON_INLINE_STYLES[t.status]}
               onClick={() => handleTransitionClick(t)}
             >
               {t.label}

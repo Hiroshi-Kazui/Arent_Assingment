@@ -49,7 +49,9 @@ export async function GET(
       projectId,
       floorId as any,
       pagination,
-      statusFilter
+      statusFilter,
+      auth.user.role,
+      auth.user.id
     );
     return successResponse(result);
   } catch (error) {
@@ -67,7 +69,7 @@ export async function POST(
 ) {
   let createdIssueId: string | null = null;
   try {
-    const auth = await requireRole('SUPERVISOR');
+    const auth = await requireRole('ADMIN', 'SUPERVISOR');
     if ('error' in auth) return auth.error;
 
     const { id } = await params;
@@ -84,7 +86,7 @@ export async function POST(
     let worldPositionZ: number | undefined;
     let assigneeId: string | undefined;
     let files: File[] = [];
-    let photoPhase: 'BEFORE' | 'AFTER' = 'BEFORE';
+    let photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION' = 'BEFORE';
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
@@ -103,7 +105,7 @@ export async function POST(
       worldPositionZ = worldZRaw !== null ? Number(worldZRaw) : undefined;
       assigneeId = String(formData.get('assigneeId') || '') || undefined;
       const photoPhaseRaw = String(formData.get('photoPhase') || 'BEFORE');
-      photoPhase = (['BEFORE', 'AFTER'].includes(photoPhaseRaw) ? photoPhaseRaw : 'BEFORE') as 'BEFORE' | 'AFTER';
+      photoPhase = (['BEFORE', 'AFTER', 'REJECTION'].includes(photoPhaseRaw) ? photoPhaseRaw : 'BEFORE') as 'BEFORE' | 'AFTER' | 'REJECTION';
       files = [
         ...formData.getAll('files').filter((v): v is File => v instanceof File),
         ...formData.getAll('file').filter((v): v is File => v instanceof File),

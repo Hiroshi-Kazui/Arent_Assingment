@@ -2,13 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ViewerHit } from '@/app/components/viewer/use-viewer-interaction';
 
 interface ElementInfoPanelProps {
@@ -148,18 +141,20 @@ export function ElementInfoPanel({
     <div className="space-y-3">
       <div className="rounded-md border bg-muted/40 p-3">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          部材
+          {element.dbId !== null ? '部材' : '空間'}
         </p>
         <p className="text-sm font-semibold line-clamp-2">
           {name || '名称不明'}
         </p>
-        <p className="text-xs text-muted-foreground font-mono mt-1">
-          dbId: {element.dbId}
-        </p>
+        {element.dbId !== null && (
+          <p className="text-xs text-muted-foreground font-mono mt-1">
+            dbId: {element.dbId}
+          </p>
+        )}
       </div>
 
       {loading ? (
-        <p className="text-xs text-muted-foreground">部材プロパティを取得中...</p>
+        <p className="text-xs text-muted-foreground">{element.dbId !== null ? '部材' : '空間'}プロパティを取得中...</p>
       ) : error ? (
         <p className="text-xs text-destructive">プロパティ取得失敗: {error}</p>
       ) : featuredProperties.length > 0 ? (
@@ -199,38 +194,18 @@ export function ElementInfoPanel({
   );
 
   return (
-    <>
-      <div
-        className="hidden sm:block absolute z-30 pointer-events-none"
-        style={{
-          left: desktopPosition?.x ?? PANEL_MARGIN + DESKTOP_PANEL_WIDTH / 2,
-          top: desktopPosition?.y ?? PANEL_MARGIN,
-          transform: 'translate(-50%, calc(-100% - 12px))',
-        }}
-      >
-        <div className="pointer-events-auto w-80 rounded-lg border bg-background/95 shadow-xl p-4 backdrop-blur-sm">
-          {content}
-        </div>
+    <div
+      className="absolute z-30 pointer-events-none"
+      style={{
+        left: desktopPosition?.x ?? PANEL_MARGIN + DESKTOP_PANEL_WIDTH / 2,
+        top: desktopPosition?.y ?? PANEL_MARGIN,
+        transform: 'translate(-50%, calc(-100% - 12px))',
+      }}
+    >
+      <div className="pointer-events-auto w-80 rounded-lg border bg-background/95 shadow-xl p-4 backdrop-blur-sm">
+        {content}
       </div>
-
-      <div className="sm:hidden">
-        <Drawer
-          open={!!element}
-          onOpenChange={(open) => {
-            if (!open) {
-              onClose();
-            }
-          }}
-        >
-          <DrawerContent className="h-[40vh]">
-            <DrawerHeader className="border-b pb-3">
-              <DrawerTitle>部材情報</DrawerTitle>
-            </DrawerHeader>
-            <ScrollArea className="flex-1 p-4">{content}</ScrollArea>
-          </DrawerContent>
-        </Drawer>
-      </div>
-    </>
+    </div>
   );
 }
 

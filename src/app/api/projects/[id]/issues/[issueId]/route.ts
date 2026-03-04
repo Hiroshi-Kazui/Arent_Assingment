@@ -49,6 +49,42 @@ export async function GET(
 }
 
 /**
+ * PATCH /api/projects/[id]/issues/[issueId]
+ * 指摘タイトルを更新（Admin / Supervisor のみ）
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<Params> }
+) {
+  try {
+    const auth = await requireRole('ADMIN', 'SUPERVISOR');
+    if ('error' in auth) return auth.error;
+
+    const { id, issueId: issueIdParam } = await params;
+    const body = await request.json();
+    const { title } = body as { title?: string };
+
+    if (!title || title.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'title is required' },
+        { status: 400 }
+      );
+    }
+
+    const handlers = getCommandHandlers();
+    await handlers.updateIssueTitle.execute({
+      issueId: issueIdParam,
+      projectId: id,
+      title: title.trim(),
+    });
+
+    return successResponse({ message: 'Issue title updated successfully' });
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+/**
  * DELETE /api/projects/[id]/issues/[issueId]
  * 指摘を削除（Supervisor のみ）
  */

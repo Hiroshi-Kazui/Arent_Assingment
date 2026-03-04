@@ -65,17 +65,17 @@ export function IssueMarkers({
     overlayContainer.innerHTML = '';
 
     const colors: Record<string, string> = {
-      POINT_OUT: '#9CA3AF',   // gray
-      OPEN: '#EF4444',        // red
-      IN_PROGRESS: '#F59E0B', // yellow
-      DONE: '#10B981',        // green
-      CONFIRMED: '#8B5CF6',   // purple
+      POINT_OUT: '#E53935',   // vivid red
+      OPEN: '#757575',        // gray
+      IN_PROGRESS: '#1E88E5', // sky blue
+      DONE: '#43A047',        // light green
+      CONFIRMED: '#00695C',   // deep teal
     };
 
     const icons: Record<string, string> = {
-      POINT_OUT: '?',
-      OPEN: '!',
-      IN_PROGRESS: '\u25D0',
+      POINT_OUT: '!',
+      OPEN: '\u25CB',
+      IN_PROGRESS: '\u25B6',
       DONE: '\u2713',
       CONFIRMED: '\u2605',
     };
