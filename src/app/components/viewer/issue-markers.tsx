@@ -66,7 +66,7 @@ export function IssueMarkers({
 
     const colors: Record<string, string> = {
       POINT_OUT: '#9CA3AF',   // gray
-      OPEN: '#3B82F6',        // blue
+      OPEN: '#EF4444',        // red
       IN_PROGRESS: '#F59E0B', // yellow
       DONE: '#10B981',        // green
       CONFIRMED: '#8B5CF6',   // purple
