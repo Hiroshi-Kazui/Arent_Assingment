@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { AuthHeader } from '@/app/components/auth-header';
 
 interface Project {
@@ -82,57 +83,79 @@ export default function ProjectListPage() {
         ) : (
           <div className="space-y-4">
             {projects.map((project) => (
-              <Link
-                key={project.projectId}
-                href={`/projects/${project.projectId}/viewer`}
-                className="block group"
-              >
-                <Card className="bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm">
-                  <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
-                    <div>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
-                      <CardDescription className="font-mono text-xs mt-1">ID: {project.projectId}</CardDescription>
-                    </div>
-                    <Badge variant="outline" className={`shrink-0 ${STATUS_COLORS[project.status] ?? 'bg-neutral-800 text-neutral-300'}`}>
-                      {STATUS_LABELS[project.status] ?? project.status}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground bg-black/20 p-3 rounded-lg border border-white/5">
-                      <span className="flex items-center gap-1.5">
-                        <span>指摘件数:</span>
-                        <Badge variant="secondary" className="font-mono">{project.issueCount}</Badge>
-                      </span>
-                      {project.startDate && (
-                        <span className="flex items-center gap-1.5">
-                          <span>開始:</span> <span className="text-foreground/80">{new Date(project.startDate).toLocaleDateString('ja-JP')}</span>
-                        </span>
-                      )}
-                      {project.dueDate && (
-                        <span className="flex items-center gap-1.5">
-                          <span>期限:</span> <span className="text-foreground/80">{new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
-                        </span>
-                      )}
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                        <span>進捗</span>
-                        <span className="font-mono">{project.progressRate}%</span>
+              <div key={project.projectId} className="group">
+                <Link href={`/projects/${project.projectId}/viewer`} className="block">
+                  <Card className="bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm">
+                    <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
+                      <div>
+                        <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                        <CardDescription className="font-mono text-xs mt-1">ID: {project.projectId}</CardDescription>
                       </div>
-                      <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${project.progressRate}%`,
-                            backgroundColor: project.progressRate >= 80 ? '#22c55e' : project.progressRate >= 40 ? '#eab308' : '#ef4444',
-                          }}
-                        />
+                      <Badge variant="outline" className={`shrink-0 ${STATUS_COLORS[project.status] ?? 'bg-neutral-800 text-neutral-300'}`}>
+                        {STATUS_LABELS[project.status] ?? project.status}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground bg-black/20 p-3 rounded-lg border border-white/5">
+                        <span className="flex items-center gap-1.5">
+                          <span>指摘件数:</span>
+                          <Badge variant="secondary" className="font-mono">{project.issueCount}</Badge>
+                        </span>
+                        {project.startDate && (
+                          <span className="flex items-center gap-1.5">
+                            <span>開始:</span> <span className="text-foreground/80">{new Date(project.startDate).toLocaleDateString('ja-JP')}</span>
+                          </span>
+                        )}
+                        {project.dueDate && (
+                          <span className="flex items-center gap-1.5">
+                            <span>期限:</span> <span className="text-foreground/80">{new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
+                          </span>
+                        )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                      {/* Progress Bar */}
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                          <span>進捗</span>
+                          <span className="font-mono">{project.progressRate}%</span>
+                        </div>
+                        <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${project.progressRate}%`,
+                              backgroundColor: project.progressRate >= 80 ? '#22c55e' : project.progressRate >= 40 ? '#eab308' : '#ef4444',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Quick access buttons below each card */}
+                <div className="flex gap-2 mt-2 px-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    asChild
+                  >
+                    <Link href={`/projects/${project.projectId}/issues`}>
+                      指摘一覧
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    asChild
+                  >
+                    <Link href={`/projects/${project.projectId}/viewer`}>
+                      3Dビュー
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
