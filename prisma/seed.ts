@@ -7,85 +7,10 @@ async function main() {
   console.log('🌱 Seeding database...');
   const BUILDING_ID = '11111111-1111-1111-1111-111111111111';
   const PROJECT_ID = '22222222-2222-2222-2222-222222222222';
-
-  // Building を作成
-  const building = await prisma.building.upsert({
-    where: { building_id: BUILDING_ID },
-    update: {
-      name: 'Aビル',
-      address: 'Tokyo, Japan',
-      latitude: '35.6762',
-      longitude: '139.7674',
-      model_urn: process.env.APS_MODEL_URN || 'default-model-urn',
-    },
-    create: {
-      building_id: BUILDING_ID,
-      name: 'Aビル',
-      address: 'Tokyo, Japan',
-      latitude: '35.6762',
-      longitude: '139.7674',
-      model_urn: process.env.APS_MODEL_URN || 'default-model-urn',
-    },
-  });
-
-  console.log(`✓ Building created: ${building.name}`);
-
-  // Floor を作成（B1F, 1F〜11F）
-  const floors = [];
-
-  // B1F（地下1階）
-  const b1fFloor = await prisma.floor.upsert({
-    where: { floor_id: '33333333-3333-3333-3333-333333333300' },
-    update: {},
-    create: {
-      floor_id: '33333333-3333-3333-3333-333333333300',
-      building_id: building.building_id,
-      name: 'B1F',
-      floor_number: -1,
-    },
-  });
-  floors.push(b1fFloor);
-  console.log(`✓ Floor created: ${b1fFloor.name}`);
-
-  for (let i = 1; i <= 11; i++) {
-    const floorId = `33333333-3333-3333-3333-3333333333${String(i).padStart(2, '0')}`;
-    const floor = await prisma.floor.upsert({
-      where: { floor_id: floorId },
-      update: {},
-      create: {
-        floor_id: floorId,
-        building_id: building.building_id,
-        name: `${i}F`,
-        floor_number: i,
-      },
-    });
-    floors.push(floor);
-    console.log(`✓ Floor created: ${floor.name}`);
-  }
-
-  // Project を作成
-  const now = new Date();
-  const dueDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90日後
-
-  const project = await prisma.project.upsert({
-    where: { project_id: PROJECT_ID },
-    update: {},
-    create: {
-      project_id: PROJECT_ID,
-      building_id: building.building_id,
-      name: 'Aビル新築工事',
-      start_date: now,
-      due_date: dueDate,
-      status: 'ACTIVE',
-    },
-  });
-
-  console.log(`✓ Project created: ${project.name}`);
-
-  // Organization seeds
   const HQ_ORG_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const BRANCH_ORG_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
+  // Organization seeds (must come before Building/Project due to FK)
   const hqOrg = await prisma.organization.upsert({
     where: { organization_id: HQ_ORG_ID },
     update: {},
@@ -108,6 +33,58 @@ async function main() {
     },
   });
   console.log(`✓ Organization created: ${branchOrg.name}`);
+
+  // Building を作成
+  const building = await prisma.building.upsert({
+    where: { building_id: BUILDING_ID },
+    update: {
+      name: 'Aビル',
+      address: 'Tokyo, Japan',
+      latitude: '35.6762',
+      longitude: '139.7674',
+      model_urn: process.env.APS_MODEL_URN || 'default-model-urn',
+      branch_id: BRANCH_ORG_ID,
+    },
+    create: {
+      building_id: BUILDING_ID,
+      name: 'Aビル',
+      address: 'Tokyo, Japan',
+      latitude: '35.6762',
+      longitude: '139.7674',
+      model_urn: process.env.APS_MODEL_URN || 'default-model-urn',
+      branch_id: BRANCH_ORG_ID,
+    },
+  });
+
+  console.log(`✓ Building created: ${building.name}`);
+
+  // Floor は Viewer 起動時に APS Model Derivative API から自動同期される
+  // seed では作成しない（sync-levels API で正確な Level 名と elevation が投入される）
+  console.log('ℹ Floors: skipped (auto-synced from APS metadata on first viewer load)');
+
+  // Project を作成
+  const now = new Date();
+  const dueDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90日後
+
+  const project = await prisma.project.upsert({
+    where: { project_id: PROJECT_ID },
+    update: {
+      branch_id: BRANCH_ORG_ID,
+      plan: '新築工事計画',
+    },
+    create: {
+      project_id: PROJECT_ID,
+      building_id: building.building_id,
+      name: 'Aビル新築工事',
+      start_date: now,
+      due_date: dueDate,
+      status: 'ACTIVE',
+      branch_id: BRANCH_ORG_ID,
+      plan: '新築工事計画',
+    },
+  });
+
+  console.log(`✓ Project created: ${project.name}`);
 
   // Users (password: "password123" for all)
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -164,6 +141,10 @@ async function main() {
     data: { reported_by: SUPERVISOR_USER_ID },
   });
   console.log('✓ Updated existing issues reported_by to supervisor user');
+
+  // ElementFloorMapping は Viewer 初回ロード時に BoundingBox ベースで自動生成される
+  // seed では作成しない
+  console.log('ℹ ElementFloorMapping: skipped (auto-generated on first viewer load)');
 
   console.log('✅ Seeding completed successfully!');
 }

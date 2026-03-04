@@ -19,11 +19,14 @@ model Building {
   latitude    Decimal  @db.Decimal(10, 8)
   longitude   Decimal  @db.Decimal(11, 8)
   model_urn   String
+  branch_id   String?
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  floors   Floor[]
-  projects Project[]
+  floors                Floor[]
+  projects              Project[]
+  branch                Organization?        @relation("BuildingBranch", fields: [branch_id], references: [organization_id])
+  elementFloorMappings  ElementFloorMapping[]
 
   @@map("building")
 }
@@ -33,12 +36,15 @@ model Floor {
   building_id   String
   name          String
   floor_number  Int
+  elevation     Decimal? @db.Decimal(10, 2)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  building Building @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
-  issues   Issue[]
+  building              Building              @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
+  issues                Issue[]
+  elementFloorMappings  ElementFloorMapping[]
 
+  @@unique([building_id, floor_number])
   @@map("floor")
 }
 
@@ -49,11 +55,14 @@ model Project {
   start_date   DateTime
   due_date     DateTime
   status       String
+  plan         String   @default("")
+  branch_id    String?
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
 
-  building Building @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
+  building Building       @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
   issues   Issue[]
+  branch   Organization?  @relation("ProjectBranch", fields: [branch_id], references: [organization_id])
 
   @@map("project")
 }
@@ -66,9 +75,11 @@ model Organization {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  parent   Organization?  @relation("OrgHierarchy", fields: [parent_id], references: [organization_id])
-  children Organization[] @relation("OrgHierarchy")
-  users    User[]
+  parent    Organization?  @relation("OrgHierarchy", fields: [parent_id], references: [organization_id])
+  children  Organization[] @relation("OrgHierarchy")
+  users     User[]
+  buildings Building[]    @relation("BuildingBranch")
+  projects  Project[]     @relation("ProjectBranch")
 
   @@map("organization")
 }
@@ -147,4 +158,19 @@ model StatusChangeLog {
   changed_by_user User  @relation("StatusChangeLogChanger", fields: [changed_by], references: [user_id])
 
   @@map("status_change_log")
+}
+
+model ElementFloorMapping {
+  building_id        String
+  db_id              Int
+  floor_id           String
+  bounding_box_min_z Decimal? @db.Decimal(10, 2)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  building Building @relation(fields: [building_id], references: [building_id], onDelete: Cascade)
+  floor    Floor    @relation(fields: [floor_id], references: [floor_id], onDelete: Cascade)
+
+  @@id([building_id, db_id])
+  @@map("element_floor_mapping")
 }
