@@ -25,7 +25,7 @@ import {
 interface Photo {
   photoId: string;
   blobKey: string;
-  photoPhase: 'BEFORE' | 'AFTER';
+  photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
   uploadedAt: string;
 }
 
@@ -418,8 +418,10 @@ export function IssueDetailPanel({
 
   const beforePhotos = issue?.photos.filter((p) => p.photoPhase === 'BEFORE') ?? [];
   const afterPhotos = issue?.photos.filter((p) => p.photoPhase === 'AFTER') ?? [];
+  const rejectionPhotos = issue?.photos.filter((p) => p.photoPhase === 'REJECTION') ?? [];
   const showBeforeNavigation = beforePhotos.length >= 4;
   const showAfterNavigation = afterPhotos.length >= 4;
+  const showRejectionNavigation = rejectionPhotos.length >= 4;
   const allTransitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
   // 担当者以外はステータス変更不可。ただし DONE→承認/否認 は例外
   const currentUserId = session?.user?.id;
@@ -607,6 +609,11 @@ export function IssueDetailPanel({
           <Badge variant="outline" className="text-[11px]">
             是正後: {afterPhotos.length}枚
           </Badge>
+          {rejectionPhotos.length > 0 && (
+            <Badge variant="outline" className="text-[11px]" style={{ borderColor: '#E53935', color: '#E53935' }}>
+              否認時: {rejectionPhotos.length}枚
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -697,6 +704,36 @@ export function IssueDetailPanel({
                 ))}
               </CarouselContent>
               {showAfterNavigation && (
+                <>
+                  <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
+                  <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
+                </>
+              )}
+            </Carousel>
+          </div>
+        )}
+
+        {rejectionPhotos.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold mb-2" style={{ color: '#E53935' }}>否認時</p>
+            <Carousel className={CAROUSEL_LAYOUT_CLASS} opts={CAROUSEL_OPTS}>
+              <CarouselContent className="-ml-2">
+                {rejectionPhotos.map((photo) => (
+                  <CarouselItem key={photo.photoId} className={CAROUSEL_ITEM_CLASS}>
+                    <PhotoCard
+                      photo={photo}
+                      url={photoUrls[photo.photoId]}
+                      onClick={() => {
+                        const selectedUrl = photoUrls[photo.photoId];
+                        if (selectedUrl) {
+                          setLightboxUrl(selectedUrl);
+                        }
+                      }}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {showRejectionNavigation && (
                 <>
                   <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
                   <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
