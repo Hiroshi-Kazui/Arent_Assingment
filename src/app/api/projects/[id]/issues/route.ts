@@ -41,12 +41,15 @@ export async function GET(
     const projectId = ProjectId.create(id);
     const url = new URL(request.url);
     const floorId = url.searchParams.get('floorId') || undefined;
+    const statusParam = url.searchParams.get('status') || undefined;
+    const statusFilter = statusParam ? statusParam.split(',').filter(Boolean) : undefined;
     const pagination = parsePaginationParams(url.searchParams);
 
     const result = await listIssues(
       projectId,
       floorId as any,
-      pagination
+      pagination,
+      statusFilter
     );
     return successResponse(result);
   } catch (error) {
@@ -79,6 +82,7 @@ export async function POST(
     let worldPositionX: number | undefined;
     let worldPositionY: number | undefined;
     let worldPositionZ: number | undefined;
+    let assigneeId: string | undefined;
     let files: File[] = [];
     let photoPhase: 'BEFORE' | 'AFTER' = 'BEFORE';
 
@@ -97,6 +101,7 @@ export async function POST(
       worldPositionX = worldXRaw !== null ? Number(worldXRaw) : undefined;
       worldPositionY = worldYRaw !== null ? Number(worldYRaw) : undefined;
       worldPositionZ = worldZRaw !== null ? Number(worldZRaw) : undefined;
+      assigneeId = String(formData.get('assigneeId') || '') || undefined;
       const photoPhaseRaw = String(formData.get('photoPhase') || 'BEFORE');
       photoPhase = (['BEFORE', 'AFTER'].includes(photoPhaseRaw) ? photoPhaseRaw : 'BEFORE') as 'BEFORE' | 'AFTER';
       files = [
@@ -115,6 +120,7 @@ export async function POST(
       worldPositionX = body.worldPositionX !== undefined ? Number(body.worldPositionX) : undefined;
       worldPositionY = body.worldPositionY !== undefined ? Number(body.worldPositionY) : undefined;
       worldPositionZ = body.worldPositionZ !== undefined ? Number(body.worldPositionZ) : undefined;
+      assigneeId = body.assigneeId ? String(body.assigneeId) : undefined;
     } else {
       return NextResponse.json(
         {
@@ -212,6 +218,7 @@ export async function POST(
       worldPositionX,
       worldPositionY,
       worldPositionZ,
+      assigneeId,
     };
 
     const handlers = getCommandHandlers();

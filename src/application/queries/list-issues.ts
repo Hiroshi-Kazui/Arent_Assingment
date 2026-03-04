@@ -11,11 +11,15 @@ import prisma from '../../infrastructure/prisma/prisma-client';
 export async function listIssues(
   projectId: ProjectId,
   floorId?: FloorId,
-  pagination?: PaginationParams
+  pagination?: PaginationParams,
+  statusFilter?: string[]
 ): Promise<PaginatedResult<IssueListItemDto>> {
-  const where: { project_id: string; floor_id?: string } = { project_id: projectId };
+  const where: { project_id: string; floor_id?: string; status?: { in: string[] } } = { project_id: projectId };
   if (floorId) {
     where.floor_id = floorId;
+  }
+  if (statusFilter && statusFilter.length > 0) {
+    where.status = { in: statusFilter };
   }
 
   const skip = pagination ? (pagination.page - 1) * pagination.limit : undefined;
