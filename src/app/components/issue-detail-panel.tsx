@@ -65,6 +65,7 @@ interface IssueDetailPanelProps {
   projectId: string;
   issueId: string;
   onIssueUpdated?: () => void;
+  onClose?: () => void;
 }
 
 interface UserOption {
@@ -159,6 +160,7 @@ export function IssueDetailPanel({
   projectId,
   issueId,
   onIssueUpdated,
+  onClose,
 }: IssueDetailPanelProps) {
   const { data: session } = useSession();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
@@ -391,6 +393,7 @@ export function IssueDetailPanel({
       }
       setDeleteConfirmOpen(false);
       onIssueUpdated?.();
+      onClose?.();
     } catch (err) {
       alert('削除エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -402,7 +405,16 @@ export function IssueDetailPanel({
   const afterPhotos = issue?.photos.filter((p) => p.photoPhase === 'AFTER') ?? [];
   const showBeforeNavigation = beforePhotos.length >= 4;
   const showAfterNavigation = afterPhotos.length >= 4;
-  const transitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
+  const allTransitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
+  // 担当者以外はステータス変更不可。ただし DONE→承認/否認 は例外
+  const currentUserId = session?.user?.id;
+  const isAssignee = issue ? issue.assigneeId === currentUserId : false;
+  const transitions = allTransitions.filter((t) => {
+    if (isAssignee) return true;
+    if (issue?.status === 'DONE' && (t.status === 'CONFIRMED' || t.status === 'OPEN')) return true;
+    if (t.status === 'ASSIGN') return true;
+    return false;
+  });
   const isOverdue = issue
     ? issue.status !== 'DONE' && issue.status !== 'CONFIRMED' &&
       new Date(issue.dueDate).setHours(0, 0, 0, 0) <=

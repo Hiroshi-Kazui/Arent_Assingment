@@ -37,6 +37,12 @@ export class UpdateIssueStatusHandler {
       );
     }
 
+    // ビジネスルール: 担当者以外はステータス変更不可。ただし DONE→承認/否認 は例外
+    const isDoneReview = issue.isDone() && (input.newStatus === 'CONFIRMED' || input.newStatus === 'OPEN');
+    if (issue.assigneeId && issue.assigneeId !== changedBy && !isDoneReview) {
+      throw new Error('担当者以外はステータスを変更できません');
+    }
+
     // ビジネスルール: InProgress → Done は是正後写真（After）が1枚以上必要
     if (input.newStatus === 'DONE') {
       const photos = await this.photoRepository.findByIssueId(issueId);

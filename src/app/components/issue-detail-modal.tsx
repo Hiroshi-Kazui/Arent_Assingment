@@ -30,6 +30,7 @@ export function IssueDetailModal({
               projectId={projectId}
               issueId={issueId}
               onIssueUpdated={onIssueUpdated}
+              onClose={() => onOpenChange(false)}
             />
           ) : null}
         </div>
