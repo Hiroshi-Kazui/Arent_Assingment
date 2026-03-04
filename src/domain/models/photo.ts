@@ -22,6 +22,7 @@ export const PhotoId = {
 export enum PhotoPhase {
   Before = 'BEFORE',
   After = 'AFTER',
+  Rejection = 'REJECTION',
 }
 
 /**
@@ -78,5 +79,12 @@ export class Photo {
    */
   isAfter(): boolean {
     return this.phase === PhotoPhase.After;
+  }
+
+  /**
+   * Rejection フェーズか判定
+   */
+  isRejection(): boolean {
+    return this.phase === PhotoPhase.Rejection;
   }
 }

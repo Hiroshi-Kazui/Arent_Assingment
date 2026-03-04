@@ -23,7 +23,8 @@ export class Floor {
     readonly id: FloorId,
     readonly buildingId: BuildingId,
     readonly name: string,
-    readonly floorNumber: number
+    readonly floorNumber: number,
+    readonly elevation: number | null
   ) {}
 
   /**
@@ -33,7 +34,8 @@ export class Floor {
     id: FloorId,
     buildingId: BuildingId,
     name: string,
-    floorNumber: number
+    floorNumber: number,
+    elevation: number | null = null
   ): Floor {
     if (!name || name.trim().length === 0) {
       throw new Error('Floor name must not be empty');
@@ -43,7 +45,7 @@ export class Floor {
       throw new Error('Floor number must be an integer');
     }
 
-    return new Floor(id, buildingId, name, floorNumber);
+    return new Floor(id, buildingId, name, floorNumber, elevation);
   }
 
   /**
@@ -53,8 +55,9 @@ export class Floor {
     id: FloorId,
     buildingId: BuildingId,
     name: string,
-    floorNumber: number
+    floorNumber: number,
+    elevation: number | null = null
   ): Floor {
-    return new Floor(id, buildingId, name, floorNumber);
+    return new Floor(id, buildingId, name, floorNumber, elevation);
   }
 }

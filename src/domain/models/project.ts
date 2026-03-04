@@ -1,4 +1,5 @@
 import { BuildingId } from './building';
+import { OrganizationId } from './organization';
 
 /**
  * Project ID - ブランド型で型安全性を確保
@@ -34,7 +35,9 @@ export class Project {
     readonly name: string,
     readonly startDate: Date,
     readonly dueDate: Date,
-    readonly status: ProjectStatus
+    readonly status: ProjectStatus,
+    readonly branchId: OrganizationId,
+    readonly plan: string
   ) {}
 
   /**
@@ -46,7 +49,9 @@ export class Project {
     name: string,
     startDate: Date,
     dueDate: Date,
-    status: ProjectStatus = ProjectStatus.Active
+    status: ProjectStatus = ProjectStatus.Active,
+    branchId: OrganizationId,
+    plan: string = ''
   ): Project {
     if (!name || name.trim().length === 0) {
       throw new Error('Project name must not be empty');
@@ -56,7 +61,7 @@ export class Project {
       throw new Error('Start date must be before due date');
     }
 
-    return new Project(id, buildingId, name, startDate, dueDate, status);
+    return new Project(id, buildingId, name, startDate, dueDate, status, branchId, plan);
   }
 
   /**
@@ -68,9 +73,11 @@ export class Project {
     name: string,
     startDate: Date,
     dueDate: Date,
-    status: ProjectStatus
+    status: ProjectStatus,
+    branchId: OrganizationId,
+    plan: string
   ): Project {
-    return new Project(id, buildingId, name, startDate, dueDate, status);
+    return new Project(id, buildingId, name, startDate, dueDate, status, branchId, plan);
   }
 
   /**
@@ -83,8 +90,23 @@ export class Project {
       this.name,
       this.startDate,
       this.dueDate,
-      newStatus
+      newStatus,
+      this.branchId,
+      this.plan
     );
+  }
+
+  /**
+   * 詳細情報更新
+   */
+  updateDetails(name: string, startDate: Date, dueDate: Date, plan: string, status: ProjectStatus): Project {
+    if (startDate >= dueDate) {
+      throw new Error('Start date must be before due date');
+    }
+    if (!name || name.trim().length === 0) {
+      throw new Error('Project name must not be empty');
+    }
+    return new Project(this.id, this.buildingId, name, startDate, dueDate, status, this.branchId, plan);
   }
 
   /**

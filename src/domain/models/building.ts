@@ -1,4 +1,5 @@
 import { Coordinate } from './coordinate';
+import { OrganizationId } from './organization';
 
 /**
  * Building ID - ブランド型で型安全性を確保
@@ -24,7 +25,8 @@ export class Building {
     readonly name: string,
     readonly address: string,
     readonly coordinate: Coordinate,
-    readonly modelUrn: string
+    readonly modelUrn: string,
+    readonly branchId: OrganizationId
   ) {}
 
   /**
@@ -35,7 +37,8 @@ export class Building {
     name: string,
     address: string,
     coordinate: Coordinate,
-    modelUrn: string
+    modelUrn: string,
+    branchId: OrganizationId
   ): Building {
     if (!name || name.trim().length === 0) {
       throw new Error('Building name must not be empty');
@@ -49,7 +52,7 @@ export class Building {
       throw new Error('Building modelUrn must not be empty');
     }
 
-    return new Building(id, name, address, coordinate, modelUrn);
+    return new Building(id, name, address, coordinate, modelUrn, branchId);
   }
 
   /**
@@ -60,8 +63,9 @@ export class Building {
     name: string,
     address: string,
     coordinate: Coordinate,
-    modelUrn: string
+    modelUrn: string,
+    branchId: OrganizationId
   ): Building {
-    return new Building(id, name, address, coordinate, modelUrn);
+    return new Building(id, name, address, coordinate, modelUrn, branchId);
   }
 }

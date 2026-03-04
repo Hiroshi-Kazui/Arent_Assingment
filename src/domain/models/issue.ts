@@ -337,6 +337,31 @@ export class Issue {
   }
 
   /**
+   * タイトルを変更
+   */
+  updateTitle(newTitle: string): Issue {
+    if (!newTitle || newTitle.trim().length === 0) {
+      throw new Error('Issue title must not be empty');
+    }
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      newTitle.trim(),
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      this.status,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      this.assigneeId
+    );
+  }
+
+  /**
    * 優先度を変更
    */
   changePriority(newPriority: IssuePriority): Issue {

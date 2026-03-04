@@ -14,4 +14,9 @@ export interface IProjectRepository {
    * すべての Project を取得
    */
   findAll(): Promise<Project[]>;
+
+  /**
+   * Project を保存（新規作成または更新）
+   */
+  save(project: Project): Promise<void>;
 }
