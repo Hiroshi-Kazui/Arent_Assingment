@@ -3,8 +3,9 @@ import {
   getIssueDetail,
 } from '@/application/queries/get-issue-detail';
 import { IssueId } from '@/domain/models/issue';
+import { getCommandHandlers } from '@/application/di';
 import { handleError, successResponse } from '@/api/utils/error-handler';
-import { requireSession } from '@/api/utils/auth';
+import { requireSession, requireRole } from '@/api/utils/auth';
 
 interface Params {
   id: string;
@@ -42,6 +43,28 @@ export async function GET(
     }
 
     return successResponse(detail);
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+/**
+ * DELETE /api/projects/[id]/issues/[issueId]
+ * 指摘を削除（Supervisor のみ）
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<Params> }
+) {
+  try {
+    const auth = await requireRole('SUPERVISOR');
+    if ('error' in auth) return auth.error;
+
+    const { id, issueId: issueIdParam } = await params;
+    const handlers = getCommandHandlers();
+    await handlers.deleteIssue.execute({ issueId: issueIdParam, projectId: id });
+
+    return successResponse({ message: 'Issue deleted successfully' });
   } catch (error) {
     return handleError(error);
   }

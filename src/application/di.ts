@@ -23,6 +23,7 @@ import { DeleteOrganizationHandler } from './commands/delete-organization';
 import { CreateUserHandler } from './commands/create-user';
 import { UpdateUserHandler } from './commands/update-user';
 import { DeactivateUserHandler } from './commands/deactivate-user';
+import { DeleteIssueHandler } from './commands/delete-issue';
 
 // ApsTokenProvider はキャッシュを内部で持つため、シングルトンとして保持
 // リクエストごとに新規インスタンスを生成するとキャッシュが無効になる
@@ -95,6 +96,7 @@ export function getCommandHandlers() {
     createUser: new CreateUserHandler(),
     updateUser: new UpdateUserHandler(),
     deactivateUser: new DeactivateUserHandler(),
+    deleteIssue: new DeleteIssueHandler(repos.issue),
   };
 }
 

@@ -102,6 +102,12 @@ export class PrismaIssueRepository implements IIssueRepository {
     return records.map((record) => this.mapToDomainModel(record));
   }
 
+  async delete(id: IssueId): Promise<void> {
+    await prisma.issue.delete({
+      where: { issue_id: id },
+    });
+  }
+
   /**
    * Prisma Issue モデルを Domain Issue に変換
    */

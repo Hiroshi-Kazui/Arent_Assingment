@@ -98,7 +98,10 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
 
 const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsComment?: boolean }>> = {
   POINT_OUT: [{ status: 'ASSIGN', label: '担当者を割り振る' }],
-  OPEN: [{ status: 'IN_PROGRESS', label: '着手する' }],
+  OPEN: [
+    { status: 'IN_PROGRESS', label: '着手する' },
+    { status: 'ASSIGN', label: '担当者を変更' },
+  ],
   IN_PROGRESS: [
     { status: 'DONE', label: '是正完了' },
     { status: 'OPEN', label: '差し戻し' },
@@ -106,8 +109,12 @@ const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsCo
   DONE: [
     { status: 'CONFIRMED', label: '承認' },
     { status: 'OPEN', label: '否認', needsComment: true },
+    { status: 'ASSIGN', label: '担当者を変更' },
   ],
-  CONFIRMED: [{ status: 'OPEN', label: '再指摘', needsComment: true }],
+  CONFIRMED: [
+    { status: 'OPEN', label: '再指摘', needsComment: true },
+    { status: 'ASSIGN', label: '担当者を変更' },
+  ],
 };
 
 const TRANSITION_BUTTON_STYLES: Record<string, string> = {
@@ -165,6 +172,10 @@ export function IssueDetailPanel({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const beforeFileInputRef = useRef<HTMLInputElement>(null);
   const afterFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Comment modal state
   const [commentModalOpen, setCommentModalOpen] = useState(false);
@@ -290,13 +301,13 @@ export function IssueDetailPanel({
 
     try {
       setUsersLoading(true);
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/assignable-users');
       if (!res.ok) {
         setUsersError(true);
         return;
       }
-      const data: UserOption[] = await res.json();
-      setUsers(data.filter((u) => u.role === 'WORKER' || u.role === 'ADMIN'));
+      const data: Array<{ userId: string; name: string; role: string; activeIssueCount: number }> = await res.json();
+      setUsers(data.map((u) => ({ userId: u.userId, name: `${u.name} (${u.activeIssueCount})`, role: u.role })));
     } catch {
       setUsersError(true);
     } finally {
@@ -365,6 +376,25 @@ export function IssueDetailPanel({
       alert('アップロードエラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/projects/${projectId}/issues/${issueId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error ?? `Failed (${res.status})`);
+      }
+      setDeleteConfirmOpen(false);
+      onIssueUpdated?.();
+    } catch (err) {
+      alert('削除エラー: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -635,6 +665,39 @@ export function IssueDetailPanel({
           </div>
         </div>
       </div>
+
+      {/* Delete button (SUPERVISOR only) */}
+      {session?.user?.role === 'SUPERVISOR' && (
+        <div className="border-t pt-4 mt-4">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteConfirmOpen(true)}
+          >
+            この指摘を削除
+          </Button>
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>指摘を削除しますか？</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            この操作は取り消せません。関連する写真もすべて削除されます。
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>
+              キャンセル
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? '削除中...' : '削除する'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Lightbox dialog */}
       <Dialog

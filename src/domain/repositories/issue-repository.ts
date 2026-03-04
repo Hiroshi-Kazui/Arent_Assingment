@@ -29,4 +29,9 @@ export interface IIssueRepository {
     projectId: ProjectId,
     floorId: FloorId
   ): Promise<Issue[]>;
+
+  /**
+   * Issue を削除（関連する Photo, StatusChangeLog もカスケード削除）
+   */
+  delete(id: IssueId): Promise<void>;
 }
