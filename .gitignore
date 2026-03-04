@@ -5,3 +5,4 @@ tsconfig.tsbuildinfo
 dev.log
 .claude/settings.local.json
 .claude/agents/.claude/
+doc/PM業務体験_課題資料.pdf
