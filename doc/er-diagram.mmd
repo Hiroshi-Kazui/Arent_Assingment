@@ -1,23 +1,25 @@
 erDiagram
-    Organization ||--o{ Organization : "parent"
+    Organization ||--o{ Organization : "parent/children"
     Organization ||--o{ User : "belongs to"
-    Organization ||--o{ Building : "manages"
-    Organization ||--o{ Project : "manages"
+    Organization ||--o{ Building : "branch"
+    Organization ||--o{ Project : "branch"
     Building ||--o{ Floor : "has"
     Building ||--o{ Project : "target"
+    Building ||--o{ ElementFloorMapping : "has"
+    Floor ||--o{ ElementFloorMapping : "maps"
     Project ||--o{ Issue : "contains"
     Floor ||--o{ Issue : "located on"
+    User ||--o{ Issue : "reported_by"
+    User ||--o{ Issue : "assignee"
+    User ||--o{ StatusChangeLog : "changed_by"
     Issue ||--o{ Photo : "attached"
-    Issue ||--o{ StatusChangeLog : "history"
-    User ||--o{ Issue : "reported by"
-    User ||--o{ Issue : "assigned to"
-    User ||--o{ StatusChangeLog : "changed by"
+    Issue ||--o{ StatusChangeLog : "logs"
 
     Organization {
         uuid organization_id PK
         string name
-        string type "Headquarters or Branch"
-        uuid parent_id FK "nullable"
+        string type "e.g. GENERAL_CONTRACTOR / BRANCH / SUBCONTRACTOR"
+        uuid parent_id FK "nullable - self-referential hierarchy"
         datetime created_at
         datetime updated_at
     }
@@ -26,22 +28,22 @@ erDiagram
         uuid user_id PK
         uuid organization_id FK
         string name
-        string email "unique"
+        string email "UNIQUE"
         string password_hash
-        string role "Admin or Supervisor or Worker"
-        boolean is_active "default true"
+        string role "e.g. SUPERVISOR / WORKER"
+        boolean is_active
         datetime created_at
         datetime updated_at
     }
 
     Building {
         uuid building_id PK
-        uuid branch_id FK "Organization Branch"
         string name
         string address
-        decimal latitude
-        decimal longitude
+        decimal latitude "Decimal(10,8)"
+        decimal longitude "Decimal(11,8)"
         string model_urn "APS BIM URN"
+        uuid branch_id FK "nullable - Organization"
         datetime created_at
         datetime updated_at
     }
@@ -49,20 +51,22 @@ erDiagram
     Floor {
         uuid floor_id PK
         uuid building_id FK
-        string name "1F B1F RF etc"
+        string name "e.g. 1F, B1F, RF"
         int floor_number "sort order"
+        decimal elevation "nullable - Decimal(10,2) meters"
         datetime created_at
         datetime updated_at
     }
 
     Project {
         uuid project_id PK
-        uuid branch_id FK "Organization Branch"
         uuid building_id FK
         string name
-        date start_date
-        date due_date
-        string status "Planning or Active or Completed"
+        datetime start_date
+        datetime due_date
+        string status "Planning / Active / Completed"
+        string plan
+        uuid branch_id FK "nullable - Organization"
         datetime created_at
         datetime updated_at
     }
@@ -72,17 +76,18 @@ erDiagram
         uuid project_id FK
         uuid floor_id FK
         string title
-        text description
-        string issue_type "Quality Safety Construction Design"
-        string status "PointOut Open InProgress Done Confirmed"
-        string location_type "DbId or WorldPosition"
-        int db_id "nullable Viewer element ID"
-        decimal world_position_x "nullable"
-        decimal world_position_y "nullable"
-        decimal world_position_z "nullable"
-        uuid reported_by FK "User Supervisor only"
-        uuid assignee_id FK "nullable User Worker"
-        date due_date "nullable remediation deadline"
+        string description
+        string issue_type "nullable - Quality / Safety / Construction / Design"
+        string status "POINT_OUT / OPEN / IN_PROGRESS / DONE / CONFIRMED"
+        datetime due_date
+        string location_type "DbId / WorldPosition"
+        int db_id "nullable - Viewer element ID"
+        decimal world_position_x "nullable - Decimal(10,2)"
+        decimal world_position_y "nullable - Decimal(10,2)"
+        decimal world_position_z "nullable - Decimal(10,2)"
+        string priority "LOW / MEDIUM / HIGH"
+        uuid reported_by FK "User"
+        uuid assignee_id FK "nullable - User"
         datetime created_at
         datetime updated_at
     }
@@ -91,16 +96,25 @@ erDiagram
         uuid photo_id PK
         uuid issue_id FK
         string blob_key "storage path"
-        string photo_phase "Before After Rejection"
+        string photo_phase "BEFORE / AFTER / REJECTION"
         datetime uploaded_at
     }
 
     StatusChangeLog {
         uuid log_id PK
         uuid issue_id FK
-        string from_status "previous status"
-        string to_status "new status"
-        uuid changed_by FK "User who changed"
-        text comment "nullable required on rejection"
+        string from_status
+        string to_status
+        uuid changed_by FK "User"
+        string comment "nullable"
         datetime changed_at
+    }
+
+    ElementFloorMapping {
+        uuid building_id PK_FK "Building - composite key"
+        int db_id PK "Viewer element ID - composite key"
+        uuid floor_id FK "Floor"
+        decimal bounding_box_min_z "nullable - Decimal(10,2)"
+        datetime created_at
+        datetime updated_at
     }

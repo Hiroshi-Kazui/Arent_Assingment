@@ -46,7 +46,7 @@ npm run dev
 - フレームワーク依存の隔離:
   - Next.js/Prisma/MinIO/APS は Domain から分離
 
-## 4. ドメイン設計（§8.2）
+## 5. ドメイン設計（§8.2）
 - `Issue` 集約が状態遷移を管理
 - 5段階ステータス: PointOut / Open / InProgress / Done / Confirmed
 - 許可遷移:
@@ -66,7 +66,7 @@ npm run dev
 - ビジネスルールは Domain 層へ集中
 - 参照図: `doc/er-diagram.mmd`
 
-## 5. 読み取りと書き込みの整理（§8.3）
+## 6. 読み取りと書き込みの整理（§8.3）
 - Command:
   - 指摘作成
   - ステータス更新
@@ -79,7 +79,7 @@ npm run dev
 - 将来拡張:
   - 件数増大時は Read Model（検索用テーブル・MV）へ分離可能
 
-## 6. 永続化戦略（§8.4）
+## 7. 永続化戦略（§8.4）
 - Repository パターン:
   - Domain interface + Infrastructure 実装
 - Prisma 型の閉じ込め:
@@ -91,7 +91,7 @@ npm run dev
   - Blob 先行書き込み -> DB 記録
   - 失敗時の孤立 Blob は運用でクリーンアップジョブ想定
 
-## 7. 外部依存の隔離（§8.5）
+## 8. 外部依存の隔離（§8.5）
 - APS:
   - `ViewerTokenProvider` interface -> `ApsTokenProvider`
   - Viewer SDK 自体は Presentation（UI）責務
@@ -99,7 +99,7 @@ npm run dev
   - `PhotoStorage` interface -> `MinioPhotoStorage`
   - S3/Azure Blob へ差し替え可能な構造
 
-## 8. 将来本番構成（§8.6）
+## 9. 将来本番構成（§8.6）
 - クラウド: Azure または AWS
 - 認証: Azure AD B2C / Auth0
 - マルチテナント: `tenant_id` + RLS
@@ -107,19 +107,43 @@ npm run dev
 - 大量データ対策: Read Model 分離、ページネーション
 - Blob配信: CDN + サムネイル自動生成
 
-## 9. 設計判断（ADR）
-- Next.js 単体構成:
-  - 制限時間内で一体開発しつつ、層分離で将来分割可能にする
-- BlobKey 方式:
-  - URL 永続化を避け、ストレージ差替え耐性を確保
-- 位置情報のカラム分割:
-  - JSON 一括保持より検索性・制約定義が明確
-- 状態遷移の Domain 配置:
-  - API/UI で重複する遷移判定を集約
-- Assignee 未実装:
-  - MVP で優先度を落とし、拡張可能なモデルだけ先行
+## 10. 設計判断（ADR）
 
-## 10. 設計仕様書
+全14件の設計判断を記録する。詳細は `doc/phase0_plan.md` セクション 0.13 を参照。
+
+- **判断1: Next.js 単体構成**:
+  - 16h 制約のため Next.js 単体を採用。設計上のレイヤー分離はディレクトリ構成で担保し、README に「本番では .NET バックエンドに分離」と明記する方針。
+- **判断2: BlobKey 方式**:
+  - URL 永続化を避け、ストレージ差替え耐性を確保。署名付き URL を動的生成することでセキュリティも担保。
+- **判断3: 位置情報のカラム分割**:
+  - JSON 一括保持より検索性・制約定義が明確。`locationType + dbId + worldPositionX/Y/Z` の正規化カラムを採用。
+- **判断4: 状態遷移の Domain 配置**:
+  - ビジネスルールはドメインに閉じ込める。API/UI で重複する遷移判定を Issue 集約内のメソッドに集約し、Application 層はオーケストレーションのみ担当。
+- **判断5: Assignee を最低要件に含めない**:
+  - 課題資料のワイヤーフレームに Assignee フィールドが定義されていないため MVP では割愛。ロール体系・ワークフローは拡張フェーズで追加。拡張可能なドメインモデルだけ先行定義。
+- **判断6: Building/Floor/Project の管理 API を実装しない**:
+  - 指摘管理 CRUD に集中するため、マスタデータはシード投入で代替。ドメインモデルは正しく定義し、将来の CRUD 追加に備える。
+- **判断7: ModelUrn を Building に配置**:
+  - 1 建造物に対して 1 統合 BIM モデルが存在する構造のため Building に配置。フロア選択は Viewer 側のセクションボックスフィルタで対応。
+- **判断8: 空間指摘（worldPosition）を今回実装しない**:
+  - 担当者への確認で Nice to have であることを確認済み。ただし課題資料 4.3「両対応が望ましい」に対し、Location Value Object で将来追加時にドメイン変更不要な構造を維持。
+- **判断9: BIM の level プロパティを信頼せず Z 座標ベースでフロア判定**:
+  - 実際の BIM データで level プロパティの不整合を確認（B1F 配管に level:4F）。BoundingBox 底面 Z 座標で判定し、結果を ElementFloorMapping テーブルに登録する方式を採用。実装時に判断14でアプローチを改訂。
+- **判断10: 5段階ステータスへの拡張**:
+  - 最低要件の3段階（Open / InProgress / Done）から、PointOut / Open / InProgress / Done / Confirmed の5段階に拡張。「担当者未定」（PointOut）と「監督承認済み」（Confirmed）の欠落は実運用上の欠陥と PM が判断し拡張を指示。現在の実装に反映済み。
+- **判断11: Organization・User の導入**:
+  - Headquarters / Branch の1階層組織構造と Admin / Supervisor / Worker の3ロールを導入。現場の実運用に「指摘者と是正作業者は別」「協力会社も管理したい」という要求が存在すると PM が判断し拡張。
+- **判断12: ロールベース認可の Application 層配置**:
+  - 認可チェックは Application 層（Command/Query ハンドラ）が担当し、Domain 層は権限ルールの定義に留める責務分担を採用。Domain 層を外部フレームワーク依存から守りつつ、ビジネスルールとしての権限定義をドメインに残す。
+- **判断13: NextAuth Credentials Provider の採用**:
+  - 本番では Azure AD B2C / Auth0 を想定しつつ、開発環境での検証容易性を優先して Credentials Provider を採用。NextAuth の抽象化により将来の OAuth プロバイダー差し替えが可能な構造を維持。
+- **判断14: フロア・部材マッピング取得戦略の変更（AEC LevelsExtension → Model Derivative API + BoundingBox Z）**:
+  - 当初は AEC LevelsExtension からレベル・標高を取得する計画だったが、対象モデルが MEP（設備）モデルであり AEC LevelsExtension のデータが存在しなかった。また AEC Model Data エンドポイントも 404 を返し、プロパティ値（上面の高さ等）は参照レベルからのオフセット値であり絶対標高ではなかった。そこで以下の2段階アプローチに変更した:
+  - **Stage 1（サーバーサイド）**: APS Model Derivative API の全プロパティから「参照レベル」のユニーク値を抽出しフロアレコードを作成。基準レベル（設計GL等）はフロアではないため除外。
+  - **Stage 2（クライアントサイド）**: Viewer 起動時に全リーフノードの BoundingBox 底面 Z を取得し、Z 値の分布をフロア数で均等分割して各フロアの標高を推定。全部材を BoundingBox Z のみでフロアに割り当てる（参照レベルプロパティはモデル作成者依存のため使用しない。判断9の方針と一貫）。結果はバックエンドに非同期永続化し、2回目以降はキャッシュから読み込む。
+  - この判断は BIM モデルの種類（建築/設備/構造）によって利用可能な API やメタデータが異なるという実データ検証から導かれた設計適応である。
+
+## 11. 設計仕様書
 
 本プロジェクトの詳細設計仕様は `doc/phase0_plan.md` に記述されている。実装に先立ってすべての要件・ドメインモデル・ADRを言語化したものであり、以下の主要な拡張設計が含まれる。
 
@@ -127,13 +151,13 @@ npm run dev
 - **5段階ステータス**: Issue の状態を PointOut / Open / InProgress / Done / Confirmed の5段階で管理する。最低要件の3段階（Open / InProgress / Done）からの拡張であり、「担当者未定」（PointOut）と「監督承認済み」（Confirmed）を明示的に区別するための判断（ADR 判断6）。この5段階ステータスは現在の実装にも反映済みで、`src/domain/models/issue.ts` の `IssueStatus` enum に実装されている。
 - **StatusChangeLog（状態変更履歴）**: Issue の全状態変更を記録するエンティティ。否認理由（コメント）も StatusChangeLog に保持する。「履歴を追いたい」というヒアリング要件に直接対応（ADR 判断7）。`src/domain/models/status-change-log.ts` として実装済み。
 - **ロールベース権限ルール**: 指摘登録は Supervisor のみ、Assignee への割り振りも Supervisor のみ、是正完了の確認・否認は Supervisor のみ、Worker は自身が Assignee の場合のみ着手・完了操作が可能、という詳細なルールをドメイン内で定義。Application 層が認可チェックを担当し、Domain 層が権限ルールを定義する責務分担（ADR 判断11）。
-- **ADR（設計判断記録）13件**: Next.js 単体構成の選択、BlobKey 方式の採用、Location 情報のカラム分割、状態遷移の Domain 配置、5段階ステータスの拡張、StatusChangeLog の導入、Organization・User の導入など、13の設計判断とその根拠を記録している。
+- **ADR（設計判断記録）14件**: Next.js 単体構成の選択、BlobKey 方式の採用、Location 情報のカラム分割、状態遷移の Domain 配置、5段階ステータスの拡張、StatusChangeLog の導入、Organization・User の導入、フロア取得戦略の変更（MEPモデル対応）など、14の設計判断とその根拠を記録している。
 - **画面遷移・UI仕様**: ログイン、管理ダッシュボード、プロジェクト一覧、フロア一覧、3Dビュー（双方向ハイライト連動）、指摘詳細（StatusChangeLog タブ含む）の6画面構成とその詳細仕様。
 - **実装フェーズ計画**: Phase 0（設計）から Phase 9（ドキュメント整備）まで全10フェーズの実装計画と工数見積もり。
 
 なお、CLAUDE.md に記載の基本仕様との相違点として、CLAUDE.md では状態遷移を Open / InProgress / Done の3段階と記述しているが、`doc/phase0_plan.md` の拡張設計（ADR 判断6）に基づき、実装では PointOut / Open / InProgress / Done / Confirmed の5段階として実装されている。
 
-## 11. ディレクトリ構成
+## 12. ディレクトリ構成
 ```text
 .
 |- .claude/
@@ -156,22 +180,78 @@ npm run dev
 |- README.md
 ```
 
-## 12. API仕様
+## 13. API仕様
 詳細は `doc/api-design.md` を参照。
 
-主なエンドポイント:
-- `GET /api/projects`
-- `GET /api/projects/{id}`
-- `GET /api/buildings`
-- `GET /api/buildings/{buildingId}/floors`
-- `GET /api/projects/{id}/issues`
-- `POST /api/projects/{id}/issues`
-- `PATCH /api/projects/{id}/issues/{issueId}/status`
-- `POST /api/projects/{id}/issues/{issueId}/photos`
-- `GET /api/photos/{photoId}/url`
-- `GET /api/viewer/token`
+### Buildings
+| Method | Path |
+|--------|------|
+| GET | `/api/buildings` |
+| GET | `/api/buildings/{buildingId}/floors` |
+| PATCH | `/api/buildings/{buildingId}/floors` |
+| GET/POST | `/api/buildings/{buildingId}/sync-levels` |
+| GET | `/api/buildings/{buildingId}/element-floor-mapping/{dbId}` |
+| POST | `/api/buildings/{buildingId}/element-floor-mapping` |
 
-## 13. AI活用: エージェント構成
+### Projects
+| Method | Path |
+|--------|------|
+| GET | `/api/projects` |
+| GET | `/api/projects/{id}` |
+| POST | `/api/projects` |
+| PATCH | `/api/projects/{id}` |
+
+### Issues
+| Method | Path |
+|--------|------|
+| POST | `/api/projects/{id}/issues` |
+| GET | `/api/projects/{id}/issues` |
+| GET | `/api/projects/{id}/issues/{issueId}` |
+| PATCH | `/api/projects/{id}/issues/{issueId}` |
+| DELETE | `/api/projects/{id}/issues/{issueId}` |
+| PATCH | `/api/projects/{id}/issues/{issueId}/status` |
+| PATCH | `/api/projects/{id}/issues/{issueId}/assignee` |
+
+### Photos
+| Method | Path |
+|--------|------|
+| POST | `/api/projects/{id}/issues/{issueId}/photos` |
+| GET | `/api/photos/{photoId}/url` |
+
+### Viewer
+| Method | Path |
+|--------|------|
+| GET | `/api/viewer/token` |
+
+### Auth
+| Method | Path |
+|--------|------|
+| GET | `/api/auth/me` |
+| POST | `/api/auth/[...nextauth]` |
+
+### Organizations
+| Method | Path |
+|--------|------|
+| GET | `/api/organizations` |
+| POST | `/api/organizations` |
+| PATCH | `/api/organizations/{id}` |
+| DELETE | `/api/organizations/{id}` |
+
+### Users
+| Method | Path |
+|--------|------|
+| GET | `/api/users` |
+| POST | `/api/users` |
+| GET | `/api/users/{id}` |
+| PATCH | `/api/users/{id}` |
+| DELETE | `/api/users/{id}` |
+
+### AssignableUsers
+| Method | Path |
+|--------|------|
+| GET | `/api/assignable-users` |
+
+## 14. AI活用: エージェント構成
 
 本プロジェクトでは Claude Code の Agent 機能を活用し、`.claude/agents/` にアーキテクチャ層と1対1で対応したサブエージェントを定義した。各エージェントはファイル所有権を明確に分離されており、PM（メインセッション）がオーケストレーション・レビュー・統合テストと最終設計判断を担当する。
 
