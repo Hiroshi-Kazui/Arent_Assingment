@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { listFloors } from '@/application/queries/list-floors';
 import { BuildingId } from '@/domain/models/building';
+import { parsePaginationParams } from '@/application/dto/pagination';
 import { handleError, successResponse } from '@/api/utils/error-handler';
 import { requireSession } from '@/api/utils/auth';
 
@@ -18,8 +18,10 @@ export async function GET(
 
     const { buildingId: buildingIdParam } = await params;
     const buildingId = BuildingId.create(buildingIdParam);
-    const floors = await listFloors(buildingId);
-    return successResponse(floors);
+    const url = new URL(request.url);
+    const pagination = parsePaginationParams(url.searchParams);
+    const result = await listFloors(buildingId, pagination);
+    return successResponse(result);
   } catch (error) {
     return handleError(error);
   }

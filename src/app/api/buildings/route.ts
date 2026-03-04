@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server';
 import { listBuildings } from '@/application/queries/list-buildings';
+import { parsePaginationParams } from '@/application/dto/pagination';
 import { handleError, successResponse } from '@/api/utils/error-handler';
 import { requireSession } from '@/api/utils/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireSession();
     if ('error' in auth) return auth.error;
 
-    const buildings = await listBuildings();
-    return successResponse(buildings);
+    const url = new URL(request.url);
+    const pagination = parsePaginationParams(url.searchParams);
+    const result = await listBuildings(pagination);
+    return successResponse(result);
   } catch (error) {
     return handleError(error);
   }

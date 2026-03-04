@@ -4,6 +4,7 @@ import {
   listIssues,
 } from '@/application/queries/list-issues';
 import { CreateIssueInput } from '@/application/dto/issue-dto';
+import { parsePaginationParams } from '@/application/dto/pagination';
 import { ProjectId } from '@/domain/models/project';
 import { handleError, successResponse } from '@/api/utils/error-handler';
 import { requireSession, requireRole } from '@/api/utils/auth';
@@ -40,12 +41,14 @@ export async function GET(
     const projectId = ProjectId.create(id);
     const url = new URL(request.url);
     const floorId = url.searchParams.get('floorId') || undefined;
+    const pagination = parsePaginationParams(url.searchParams);
 
-    const issues = await listIssues(
+    const result = await listIssues(
       projectId,
-      floorId as any
+      floorId as any,
+      pagination
     );
-    return successResponse(issues);
+    return successResponse(result);
   } catch (error) {
     return handleError(error);
   }
