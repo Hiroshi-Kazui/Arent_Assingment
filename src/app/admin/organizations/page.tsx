@@ -202,7 +202,14 @@ export default function OrganizationsPage() {
             <tbody className="divide-y divide-neutral-800">
               {orgs.map((org) => (
                 <tr key={org.organizationId} className="hover:bg-neutral-900/30 transition-colors">
-                  <td className="px-4 py-3 font-medium">{org.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link
+                      href={`/admin/organizations/${org.organizationId}`}
+                      className="hover:underline text-primary"
+                    >
+                      {org.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {org.type === 'HEADQUARTERS' ? '本部' : '支部'}
                   </td>
