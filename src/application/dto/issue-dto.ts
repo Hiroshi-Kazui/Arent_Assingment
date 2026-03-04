@@ -31,6 +31,15 @@ export interface UpdateIssueStatusInput {
 }
 
 /**
+ * Issue タイトル更新入力
+ */
+export interface UpdateIssueTitleInput {
+  issueId: string;
+  projectId: string;
+  title: string;
+}
+
+/**
  * Issue 担当者割り当て入力
  */
 export interface AssignIssueInput {
@@ -94,5 +103,5 @@ export interface AddPhotoInput {
   file: Buffer;
   fileName: string;
   contentType: string;
-  photoPhase: 'BEFORE' | 'AFTER';
+  photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
 }

@@ -5,6 +5,6 @@
 export interface PhotoDto {
   photoId: string;
   blobKey: string;
-  photoPhase: 'BEFORE' | 'AFTER';
+  photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
   uploadedAt: Date;
 }

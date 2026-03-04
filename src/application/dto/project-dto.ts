@@ -5,8 +5,10 @@ export interface ProjectListItemDto {
   projectId: string;
   name: string;
   buildingId: string;
+  branchId: string;
   status: string;
   issueCount: number;
+  progressRate: number;
   startDate: Date;
   dueDate: Date;
 }

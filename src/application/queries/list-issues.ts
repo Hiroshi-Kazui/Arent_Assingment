@@ -12,7 +12,9 @@ export async function listIssues(
   projectId: ProjectId,
   floorId?: FloorId,
   pagination?: PaginationParams,
-  statusFilter?: string[]
+  statusFilter?: string[],
+  userRole?: string,
+  userId?: string
 ): Promise<PaginatedResult<IssueListItemDto>> {
   const where: { project_id: string; floor_id?: string; status?: { in: string[] } } = { project_id: projectId };
   if (floorId) {
@@ -20,6 +22,9 @@ export async function listIssues(
   }
   if (statusFilter && statusFilter.length > 0) {
     where.status = { in: statusFilter };
+  }
+  if (userRole === 'WORKER' && userId) {
+    (where as any).assignee_id = userId;
   }
 
   const skip = pagination ? (pagination.page - 1) * pagination.limit : undefined;

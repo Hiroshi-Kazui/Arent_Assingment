@@ -42,13 +42,16 @@ export class AddPhotoHandler {
       input.contentType
     );
 
+    const phase = input.photoPhase === 'AFTER'
+      ? PhotoPhase.After
+      : input.photoPhase === 'REJECTION'
+        ? PhotoPhase.Rejection
+        : PhotoPhase.Before;
     const photo = Photo.create(
       photoId,
       issueId,
       blobKey,
-      input.photoPhase === 'AFTER'
-        ? PhotoPhase.After
-        : PhotoPhase.Before
+      phase
     );
     await this.photoRepository.save(photo);
 

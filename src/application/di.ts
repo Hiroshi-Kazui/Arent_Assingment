@@ -10,6 +10,7 @@ import { PrismaFloorRepository } from '../infrastructure/prisma/prisma-floor-rep
 import { PrismaPhotoRepository } from '../infrastructure/prisma/prisma-photo-repository';
 import { PrismaStatusChangeLogRepository } from '../infrastructure/prisma/prisma-status-change-log-repository';
 import { PrismaOrganizationRepository } from '../infrastructure/prisma/prisma-organization-repository';
+import { PrismaElementFloorMappingRepository } from '../infrastructure/prisma/prisma-element-floor-mapping-repository';
 import { MinioPhotoStorage } from '../infrastructure/minio/minio-photo-storage';
 import { ApsTokenProvider } from '../infrastructure/aps/aps-token-provider';
 
@@ -24,6 +25,10 @@ import { CreateUserHandler } from './commands/create-user';
 import { UpdateUserHandler } from './commands/update-user';
 import { DeactivateUserHandler } from './commands/deactivate-user';
 import { DeleteIssueHandler } from './commands/delete-issue';
+import { UpdateIssueTitleHandler } from './commands/update-issue-title';
+import { CreateProjectHandler } from './commands/create-project';
+import { UpdateProjectHandler } from './commands/update-project';
+import { InitializeModelHandler } from './commands/initialize-model';
 
 // ApsTokenProvider はキャッシュを内部で持つため、シングルトンとして保持
 // リクエストごとに新規インスタンスを生成するとキャッシュが無効になる
@@ -52,6 +57,7 @@ export function getRepositories() {
     photo: new PrismaPhotoRepository(),
     statusChangeLog: new PrismaStatusChangeLogRepository(),
     organization: new PrismaOrganizationRepository(),
+    elementFloorMapping: new PrismaElementFloorMappingRepository(),
   };
 }
 
@@ -97,6 +103,10 @@ export function getCommandHandlers() {
     updateUser: new UpdateUserHandler(),
     deactivateUser: new DeactivateUserHandler(),
     deleteIssue: new DeleteIssueHandler(repos.issue),
+    updateIssueTitle: new UpdateIssueTitleHandler(repos.issue),
+    createProject: new CreateProjectHandler(repos.project),
+    updateProject: new UpdateProjectHandler(repos.project),
+    initializeModel: new InitializeModelHandler(repos.building, repos.floor, repos.elementFloorMapping),
   };
 }
 

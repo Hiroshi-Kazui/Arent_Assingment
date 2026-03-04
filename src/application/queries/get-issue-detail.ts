@@ -54,7 +54,7 @@ export async function getIssueDetail(
     photos: issue.photos.map((photo) => ({
       photoId: photo.photo_id,
       blobKey: photo.blob_key,
-      photoPhase: photo.photo_phase as 'BEFORE' | 'AFTER',
+      photoPhase: photo.photo_phase as 'BEFORE' | 'AFTER' | 'REJECTION',
       uploadedAt: photo.uploaded_at,
     })),
     assigneeId: issue.assignee_id ?? undefined,

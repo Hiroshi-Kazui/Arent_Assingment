@@ -32,6 +32,9 @@ export async function listFloors(
     floorId: floor.floor_id,
     name: floor.name,
     floorNumber: floor.floor_number,
+    elevation: floor.elevation !== null && floor.elevation !== undefined
+      ? Number(floor.elevation)
+      : null,
     issueCount: floor._count.issues,
   }));
 
