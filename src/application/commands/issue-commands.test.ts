@@ -141,10 +141,10 @@ describe('Issue Commands - 統合テスト', () => {
 
   describe('CreateIssue → list-issues の確認', () => {
     it('作成した Issue が list-issues で取得できる', async () => {
-      const issues = await listIssues(projectId);
+      const result = await listIssues(projectId);
 
-      const foundIssue = issues.find(
-        (issue) => issue.issueId === createdIssueId
+      const foundIssue = result.items.find(
+        (issue: any) => issue.issueId === createdIssueId
       );
       expect(foundIssue).toBeDefined();
       expect(foundIssue?.title).toBe('テスト指摘');
