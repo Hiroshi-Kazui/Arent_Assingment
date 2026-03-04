@@ -16,6 +16,7 @@ export interface CreateIssueInput {
   worldPositionX?: number;
   worldPositionY?: number;
   worldPositionZ?: number;
+  assigneeId?: string;
 }
 
 /**

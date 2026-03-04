@@ -70,18 +70,36 @@ export class CreateIssueHandler {
     const issueType = parseIssueType(input.issueType);
     const reportedByUserId = UserId.create(input.reportedBy);
 
-    const issue = Issue.create(
-      issueId,
-      projectId,
-      floorId,
-      input.title,
-      input.description,
-      issueType,
-      reportedByUserId,
-      location,
-      dueDate,
-      IssuePriority.Medium
-    );
+    let issue: Issue;
+    if (input.assigneeId) {
+      const assigneeUserId = UserId.create(input.assigneeId);
+      issue = Issue.createWithAssignee(
+        issueId,
+        projectId,
+        floorId,
+        input.title,
+        input.description,
+        issueType,
+        reportedByUserId,
+        location,
+        dueDate,
+        assigneeUserId,
+        IssuePriority.Medium
+      );
+    } else {
+      issue = Issue.create(
+        issueId,
+        projectId,
+        floorId,
+        input.title,
+        input.description,
+        issueType,
+        reportedByUserId,
+        location,
+        dueDate,
+        IssuePriority.Medium
+      );
+    }
 
     // Issue を永続化
     await this.issueRepository.save(issue);

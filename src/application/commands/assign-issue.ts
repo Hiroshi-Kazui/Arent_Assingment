@@ -24,17 +24,20 @@ export class AssignIssueHandler {
     if (issue.projectId !== projectId) throw new Error(`Issue does not belong to project ${projectId}`);
 
     const fromStatus = issue.status;
-    const updatedIssue = issue.assignTo(assigneeId);
+    const updatedIssue = issue.changeAssignee(assigneeId);
 
     await this.issueRepository.save(updatedIssue);
 
-    const log = StatusChangeLog.create(
-      StatusChangeLogId.create(randomUUID()),
-      issueId,
-      fromStatus,
-      updatedIssue.status,
-      changedBy
-    );
-    await this.statusChangeLogRepository.save(log);
+    // ステータスが変更された場合のみログ記録
+    if (fromStatus !== updatedIssue.status) {
+      const log = StatusChangeLog.create(
+        StatusChangeLogId.create(randomUUID()),
+        issueId,
+        fromStatus,
+        updatedIssue.status,
+        changedBy
+      );
+      await this.statusChangeLogRepository.save(log);
+    }
   }
 }

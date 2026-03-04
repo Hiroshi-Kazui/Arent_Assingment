@@ -122,6 +122,43 @@ export class Issue {
   }
 
   /**
+   * ファクトリメソッド - 担当者付き新規作成
+   * 担当者が指定された場合、POINT_OUTをスキップしてOPENで作成する
+   */
+  static createWithAssignee(
+    id: IssueId,
+    projectId: ProjectId,
+    floorId: FloorId,
+    title: string,
+    description: string,
+    issueType: IssueType | undefined,
+    reportedBy: UserId,
+    location: Location,
+    dueDate: Date,
+    assigneeId: UserId,
+    priority: IssuePriority = IssuePriority.Medium
+  ): Issue {
+    if (!title || title.trim().length === 0) {
+      throw new Error('Issue title must not be empty');
+    }
+    if (!description || description.trim().length === 0) {
+      throw new Error('Issue description must not be empty');
+    }
+    if (Number.isNaN(dueDate.getTime())) {
+      throw new Error('Issue dueDate is invalid');
+    }
+
+    const now = new Date();
+    return new Issue(
+      id, projectId, floorId, title, description, issueType,
+      reportedBy, location, priority,
+      IssueStatus.Open,
+      dueDate, now, now,
+      assigneeId
+    );
+  }
+
+  /**
    * 永続化層から復元
    */
   static reconstruct(
@@ -344,6 +381,40 @@ export class Issue {
       this.createdAt,
       new Date(),
       assigneeId
+    );
+  }
+
+  /**
+   * 担当者変更（IN_PROGRESS以外の状態で可能）
+   * POINT_OUT → OPEN への遷移も含む（初回割り振り）
+   */
+  changeAssignee(newAssigneeId: UserId): Issue {
+    if (this.status === IssueStatus.InProgress) {
+      throw new InvalidStatusTransitionError(
+        this.status,
+        'changeAssignee is not allowed during IN_PROGRESS' as any
+      );
+    }
+
+    const newStatus = this.status === IssueStatus.PointOut
+      ? IssueStatus.Open
+      : this.status;
+
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      this.description,
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      newStatus,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      newAssigneeId
     );
   }
 
