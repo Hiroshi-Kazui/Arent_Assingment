@@ -5,6 +5,7 @@ import {
   ProjectStatus,
 } from '../../domain/models/project';
 import { BuildingId } from '../../domain/models/building';
+import { OrganizationId } from '../../domain/models/organization';
 import prisma from './prisma-client';
 
 /**
@@ -45,7 +46,34 @@ export class PrismaProjectRepository implements IProjectRepository {
       record.name,
       record.start_date,
       record.due_date,
-      status
+      status,
+      (record.branch_id ? OrganizationId.create(record.branch_id) : '' as OrganizationId),
+      record.plan ?? ''
     );
+  }
+
+  async save(project: Project): Promise<void> {
+    await prisma.project.upsert({
+      where: { project_id: project.id },
+      update: {
+        building_id: project.buildingId,
+        name: project.name,
+        start_date: project.startDate,
+        due_date: project.dueDate,
+        status: project.status,
+        branch_id: project.branchId || null,
+        plan: project.plan,
+      },
+      create: {
+        project_id: project.id,
+        building_id: project.buildingId,
+        name: project.name,
+        start_date: project.startDate,
+        due_date: project.dueDate,
+        status: project.status,
+        branch_id: project.branchId || null,
+        plan: project.plan,
+      },
+    });
   }
 }

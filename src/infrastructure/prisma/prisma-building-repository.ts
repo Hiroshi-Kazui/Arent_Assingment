@@ -4,6 +4,7 @@ import {
   BuildingId,
 } from '../../domain/models/building';
 import { Coordinate } from '../../domain/models/coordinate';
+import { OrganizationId } from '../../domain/models/organization';
 import prisma from './prisma-client';
 
 /**
@@ -41,7 +42,8 @@ export class PrismaBuildingRepository implements IBuildingRepository {
       record.name,
       record.address,
       coordinate,
-      record.model_urn
+      record.model_urn,
+      (record.branch_id ? OrganizationId.create(record.branch_id) : '' as OrganizationId)
     );
   }
 }

@@ -16,6 +16,33 @@ export class PrismaFloorRepository implements IFloorRepository {
     return records.map((record) => this.mapToDomainModel(record));
   }
 
+  async bulkUpsert(floors: Floor[]): Promise<Floor[]> {
+    const results = await prisma.$transaction(
+      floors.map((f) =>
+        prisma.floor.upsert({
+          where: {
+            building_id_floor_number: {
+              building_id: f.buildingId,
+              floor_number: f.floorNumber,
+            },
+          },
+          update: {
+            name: f.name,
+            elevation: f.elevation,
+          },
+          create: {
+            floor_id: f.id,
+            building_id: f.buildingId,
+            name: f.name,
+            floor_number: f.floorNumber,
+            elevation: f.elevation,
+          },
+        })
+      )
+    );
+    return results.map((r) => this.mapToDomainModel(r));
+  }
+
   /**
    * Prisma Floor モデルを Domain Floor に変換
    */
@@ -24,7 +51,8 @@ export class PrismaFloorRepository implements IFloorRepository {
       record.floor_id as FloorId,
       record.building_id as BuildingId,
       record.name,
-      record.floor_number
+      record.floor_number,
+      record.elevation != null ? Number(record.elevation) : null
     );
   }
 }
