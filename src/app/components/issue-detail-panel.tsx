@@ -95,6 +95,10 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   safety: '安全',
   construction: '施工',
   design: '設計',
+  QUALITY: '品質',
+  SAFETY: '安全',
+  CONSTRUCTION: '施工',
+  DESIGN: '設計',
 };
 
 const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsComment?: boolean }>> = {

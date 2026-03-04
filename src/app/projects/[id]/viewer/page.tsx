@@ -100,6 +100,10 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   safety: '安全不備',
   construction: '施工不備',
   design: '設計変更',
+  QUALITY: '品質不良',
+  SAFETY: '安全不備',
+  CONSTRUCTION: '施工不備',
+  DESIGN: '設計変更',
 };
 
 const INVALID_MODEL_URNS = new Set([
