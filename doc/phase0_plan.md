@@ -397,8 +397,6 @@ Confirmed --> Open     : 再指摘（Admin/Supervisorのコメント必須）
 - ダブルクリック/長押しの採用理由: シングルクリックはビューの回転・選択操作と競合するため
 - 登録時にAssignee（作業担当者）を同時設定可能（設定した場合PointOutをスキップ）
 
-**マーカーのステータス表示:**
-- マーカーの色でステータスを視覚的に区別（PointOut:灰, Open:青, InProgress:黄, Done:緑, Confirmed:紫）
 
 **Worker向け:**
 - 自分がAssigneeの指摘のマーカーのみ表示
