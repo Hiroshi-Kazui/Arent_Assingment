@@ -37,9 +37,11 @@ export class UpdateIssueStatusHandler {
       );
     }
 
-    // ビジネスルール: 担当者以外はステータス変更不可。ただし DONE→承認/否認 は例外
+    // ビジネスルール: 担当者以外はステータス変更不可。
+    // ただし DONE→承認/否認、CONFIRMED→再指摘(OPEN) は例外
     const isDoneReview = issue.isDone() && (input.newStatus === 'CONFIRMED' || input.newStatus === 'OPEN');
-    if (issue.assigneeId && issue.assigneeId !== changedBy && !isDoneReview) {
+    const isReissue = issue.isConfirmed() && input.newStatus === 'OPEN';
+    if (issue.assigneeId && issue.assigneeId !== changedBy && !isDoneReview && !isReissue) {
       throw new Error('担当者以外はステータスを変更できません');
     }
 
@@ -59,6 +61,15 @@ export class UpdateIssueStatusHandler {
     ) {
       if (!input.comment || input.comment.trim().length === 0) {
         throw new Error('否認・再指摘にはコメントが必須です');
+      }
+    }
+
+    // 再指摘時は否認時写真(REJECTION)が1枚以上必要
+    if (issue.isConfirmed() && input.newStatus === 'OPEN') {
+      const photos = await this.photoRepository.findByIssueId(issueId);
+      const rejectionPhotos = photos.filter((p) => p.phase === PhotoPhase.Rejection);
+      if (rejectionPhotos.length === 0) {
+        throw new Error('再指摘には否認時写真が1枚以上必要です');
       }
     }
 

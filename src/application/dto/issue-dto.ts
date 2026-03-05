@@ -39,6 +39,12 @@ export interface UpdateIssueTitleInput {
   title: string;
 }
 
+export interface UpdateIssueDescriptionInput {
+  issueId: string;
+  projectId: string;
+  description: string;
+}
+
 /**
  * Issue 担当者割り当て入力
  */
@@ -77,6 +83,9 @@ export interface IssueListItemDto {
   worldPositionY?: number;
   worldPositionZ?: number;
   reportedBy: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  floorName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -88,6 +97,7 @@ export interface IssueDetailDto extends IssueListItemDto {
   projectId: string;
   description: string;
   floorId: string;
+  floorName?: string;
   photos: PhotoDto[];
   assigneeId?: string;
   assigneeName?: string;
@@ -104,4 +114,14 @@ export interface AddPhotoInput {
   fileName: string;
   contentType: string;
   photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
+  uploadedBy: string;
+}
+
+/**
+ * Photo 削除入力
+ */
+export interface DeletePhotoInput {
+  photoId: string;
+  userId: string;
+  userRole: string;
 }

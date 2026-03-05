@@ -4,6 +4,7 @@ export interface OrganizationDto {
   type: 'HEADQUARTERS' | 'BRANCH';
   parentId?: string;
   userCount: number;
+  projectCount: number;
   createdAt: Date;
   updatedAt: Date;
 }

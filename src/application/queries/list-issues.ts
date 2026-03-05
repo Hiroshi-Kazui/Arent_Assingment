@@ -36,6 +36,10 @@ export async function listIssues(
       orderBy: { due_date: 'asc' },
       skip,
       take,
+      include: {
+        assignee: { select: { name: true } },
+        floor: { select: { name: true } },
+      },
     }),
     prisma.issue.count({ where }),
   ]);
@@ -59,6 +63,9 @@ export async function listIssues(
       ? Number(issue.world_position_z)
       : undefined,
     reportedBy: issue.reported_by,
+    assigneeId: issue.assignee_id ?? undefined,
+    assigneeName: issue.assignee?.name ?? undefined,
+    floorName: issue.floor?.name ?? undefined,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
   }));

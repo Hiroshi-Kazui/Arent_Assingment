@@ -30,15 +30,21 @@ export async function listProjects(
   }
   // ADMIN: no filter (sees all)
 
+  // For WORKER: filter issues by assignee_id when calculating count/progress
+  const issueWhere = (userRole === 'WORKER' && userId)
+    ? { assignee_id: userId }
+    : undefined;
+
   const [projects, totalCount] = await Promise.all([
     prisma.project.findMany({
       where: whereConditions,
       include: {
         _count: {
-          select: { issues: true },
+          select: { issues: { where: issueWhere } },
         },
         issues: {
           select: { status: true },
+          where: issueWhere,
         },
       },
       orderBy: { created_at: 'desc' },
@@ -63,6 +69,7 @@ export async function listProjects(
     return {
       projectId: project.project_id,
       name: project.name,
+      plan: project.plan,
       buildingId: project.building_id,
       branchId: project.branch_id ?? '',
       status: project.status,

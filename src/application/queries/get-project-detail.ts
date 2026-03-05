@@ -12,6 +12,7 @@ export async function getProjectDetail(
     where: { project_id: projectId },
     include: {
       building: true,
+      branch: true,
     },
   });
 
@@ -23,6 +24,8 @@ export async function getProjectDetail(
     projectId: project.project_id,
     name: project.name,
     buildingId: project.building_id,
+    branchId: project.branch_id,
+    branchName: project.branch?.name ?? null,
     status: project.status,
     startDate: project.start_date,
     dueDate: project.due_date,

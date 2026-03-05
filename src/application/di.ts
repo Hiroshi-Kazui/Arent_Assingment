@@ -17,6 +17,7 @@ import { ApsTokenProvider } from '../infrastructure/aps/aps-token-provider';
 import { CreateIssueHandler } from './commands/create-issue';
 import { UpdateIssueStatusHandler } from './commands/update-issue-status';
 import { AddPhotoHandler } from './commands/add-photo';
+import { DeletePhotoHandler } from './commands/delete-photo';
 import { AssignIssueHandler } from './commands/assign-issue';
 import { CreateOrganizationHandler } from './commands/create-organization';
 import { UpdateOrganizationHandler } from './commands/update-organization';
@@ -26,6 +27,7 @@ import { UpdateUserHandler } from './commands/update-user';
 import { DeactivateUserHandler } from './commands/deactivate-user';
 import { DeleteIssueHandler } from './commands/delete-issue';
 import { UpdateIssueTitleHandler } from './commands/update-issue-title';
+import { UpdateIssueDescriptionHandler } from './commands/update-issue-description';
 import { CreateProjectHandler } from './commands/create-project';
 import { UpdateProjectHandler } from './commands/update-project';
 import { InitializeModelHandler } from './commands/initialize-model';
@@ -95,6 +97,10 @@ export function getCommandHandlers() {
       storages.photoStorage,
       repos.photo
     ),
+    deletePhoto: new DeletePhotoHandler(
+      repos.photo,
+      storages.photoStorage
+    ),
     assignIssue: new AssignIssueHandler(repos.issue, repos.statusChangeLog),
     createOrganization: new CreateOrganizationHandler(repos.organization),
     updateOrganization: new UpdateOrganizationHandler(repos.organization),
@@ -104,6 +110,7 @@ export function getCommandHandlers() {
     deactivateUser: new DeactivateUserHandler(),
     deleteIssue: new DeleteIssueHandler(repos.issue),
     updateIssueTitle: new UpdateIssueTitleHandler(repos.issue),
+    updateIssueDescription: new UpdateIssueDescriptionHandler(repos.issue),
     createProject: new CreateProjectHandler(repos.project),
     updateProject: new UpdateProjectHandler(repos.project),
     initializeModel: new InitializeModelHandler(repos.building, repos.floor, repos.elementFloorMapping),

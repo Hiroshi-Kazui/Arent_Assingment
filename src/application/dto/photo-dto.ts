@@ -7,4 +7,5 @@ export interface PhotoDto {
   blobKey: string;
   photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
   uploadedAt: Date;
+  uploadedBy?: string;
 }

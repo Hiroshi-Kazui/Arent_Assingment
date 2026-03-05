@@ -20,6 +20,7 @@ export async function getIssueDetail(
         include: { changed_by_user: { select: { name: true } } },
       },
       assignee: { select: { name: true } },
+      floor: { select: { name: true } },
     },
   });
 
@@ -51,11 +52,13 @@ export async function getIssueDetail(
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
     floorId: issue.floor_id,
+    floorName: issue.floor?.name ?? undefined,
     photos: issue.photos.map((photo) => ({
       photoId: photo.photo_id,
       blobKey: photo.blob_key,
       photoPhase: photo.photo_phase as 'BEFORE' | 'AFTER' | 'REJECTION',
       uploadedAt: photo.uploaded_at,
+      uploadedBy: photo.uploaded_by ?? undefined,
     })),
     assigneeId: issue.assignee_id ?? undefined,
     assigneeName: issue.assignee?.name ?? undefined,

@@ -51,7 +51,8 @@ export class AddPhotoHandler {
       photoId,
       issueId,
       blobKey,
-      phase
+      phase,
+      input.uploadedBy
     );
     await this.photoRepository.save(photo);
 

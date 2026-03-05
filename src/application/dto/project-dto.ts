@@ -4,6 +4,7 @@
 export interface ProjectListItemDto {
   projectId: string;
   name: string;
+  plan: string;
   buildingId: string;
   branchId: string;
   status: string;
@@ -20,6 +21,8 @@ export interface ProjectDetailDto {
   projectId: string;
   name: string;
   buildingId: string;
+  branchId: string | null;
+  branchName: string | null;
   status: string;
   startDate: Date;
   dueDate: Date;

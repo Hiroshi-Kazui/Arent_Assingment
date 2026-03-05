@@ -3,7 +3,7 @@ import { OrganizationDto } from '../dto/organization-dto';
 
 export async function listOrganizations(): Promise<OrganizationDto[]> {
   const orgs = await prisma.organization.findMany({
-    include: { _count: { select: { users: true } } },
+    include: { _count: { select: { users: true, projects: true } } },
     orderBy: { created_at: 'asc' },
   });
 
@@ -13,6 +13,7 @@ export async function listOrganizations(): Promise<OrganizationDto[]> {
     type: o.type as 'HEADQUARTERS' | 'BRANCH',
     parentId: o.parent_id ?? undefined,
     userCount: o._count.users,
+    projectCount: o._count.projects,
     createdAt: o.created_at,
     updatedAt: o.updated_at,
   }));
