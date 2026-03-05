@@ -65,6 +65,7 @@ npm run dev
   - `worldPosition(x,y,z)`（空間指摘）
 - ビジネスルールは Domain 層へ集中
 - 参照図: `doc/er-diagram.mmd`
+- Domain 層は外部依存ゼロのため、Prisma・MinIO・NextAuth なしで純粋なユニットテストが可能。`src/domain/models/issue.test.ts` に状態遷移ルール（31テスト）を実装済み。Application 層の統合テスト（`src/application/commands/issue-commands.test.ts`）も含め計5ファイル・約850行のテストコードが存在する。
 
 ## 6. 読み取りと書き込みの整理（§8.3）
 - Command:
@@ -142,6 +143,8 @@ npm run dev
   - **Stage 1（サーバーサイド）**: APS Model Derivative API の全プロパティから「参照レベル」のユニーク値を抽出しフロアレコードを作成。基準レベル（設計GL等）はフロアではないため除外。
   - **Stage 2（クライアントサイド）**: Viewer 起動時に全リーフノードの BoundingBox 底面 Z を取得し、Z 値の分布をフロア数で均等分割して各フロアの標高を推定。全部材を BoundingBox Z のみでフロアに割り当てる（参照レベルプロパティはモデル作成者依存のため使用しない。判断9の方針と一貫）。結果はバックエンドに非同期永続化し、2回目以降はキャッシュから読み込む。
   - この判断は BIM モデルの種類（建築/設備/構造）によって利用可能な API やメタデータが異なるという実データ検証から導かれた設計適応である。
+- **判断15: トランザクション境界と楽観ロックの設計方針**:
+  - 16時間制約のため、楽観ロック（version カラム）は未実装。現状は Prisma の暗黙トランザクションと Blob-first 戦略で整合性を担保。本番では Issue 集約に `version` フィールドを追加し、同時更新の衝突を検知する楽観ロックを導入する設計を想定。Blob + DB の跨ぎ操作については Outbox パターンによる結果整合性への移行を計画（詳細は `docs/architecture.md` §8.6, §10.6）。
 
 ## 11. 設計仕様書
 
