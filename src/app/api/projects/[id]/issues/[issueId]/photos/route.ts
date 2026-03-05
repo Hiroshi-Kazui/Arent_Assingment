@@ -28,7 +28,7 @@ export async function POST(
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const auth = await requireRole('SUPERVISOR', 'WORKER');
+    const auth = await requireRole('ADMIN', 'SUPERVISOR', 'WORKER');
     if ('error' in auth) return auth.error;
 
     const { id, issueId } = await params;
@@ -88,6 +88,7 @@ export async function POST(
         fileName: file.name,
         contentType: file.type,
         photoPhase: photoPhase as 'BEFORE' | 'AFTER' | 'REJECTION',
+        uploadedBy: auth.user.id,
       });
 
       uploadedPhotos.push({

@@ -57,6 +57,14 @@ export async function PATCH(
       );
     }
 
+    // 承認(CONFIRMED)は Admin/Supervisor のみ
+    if (normalizedStatus === 'CONFIRMED' && auth.user.role === 'WORKER') {
+      return NextResponse.json(
+        { error: 'Workers cannot approve issues' },
+        { status: 403 }
+      );
+    }
+
     const handlers = getCommandHandlers();
     await handlers.updateIssueStatus.execute({
       issueId,

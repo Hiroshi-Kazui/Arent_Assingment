@@ -236,6 +236,7 @@ export async function POST(
         fileName: file.name,
         contentType: file.type,
         photoPhase,
+        uploadedBy: auth.user.id,
       });
     }
 

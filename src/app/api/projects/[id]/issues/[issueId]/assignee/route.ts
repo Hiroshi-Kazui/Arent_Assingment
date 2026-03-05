@@ -20,7 +20,7 @@ export async function PATCH(
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const auth = await requireRole('SUPERVISOR');
+    const auth = await requireRole('SUPERVISOR', 'ADMIN');
     if ('error' in auth) return auth.error;
 
     const { id, issueId } = await params;

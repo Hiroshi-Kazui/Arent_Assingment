@@ -50,7 +50,7 @@ export async function GET(
 
 /**
  * PATCH /api/projects/[id]/issues/[issueId]
- * 指摘タイトルを更新（Admin / Supervisor のみ）
+ * 指摘のタイトル・説明を更新（Admin / Supervisor のみ）
  */
 export async function PATCH(
   request: Request,
@@ -62,23 +62,34 @@ export async function PATCH(
 
     const { id, issueId: issueIdParam } = await params;
     const body = await request.json();
-    const { title } = body as { title?: string };
+    const { title, description } = body as { title?: string; description?: string };
 
-    if (!title || title.trim().length === 0) {
+    if (!title && !description) {
       return NextResponse.json(
-        { error: 'title is required' },
+        { error: 'title or description is required' },
         { status: 400 }
       );
     }
 
     const handlers = getCommandHandlers();
-    await handlers.updateIssueTitle.execute({
-      issueId: issueIdParam,
-      projectId: id,
-      title: title.trim(),
-    });
 
-    return successResponse({ message: 'Issue title updated successfully' });
+    if (title && title.trim().length > 0) {
+      await handlers.updateIssueTitle.execute({
+        issueId: issueIdParam,
+        projectId: id,
+        title: title.trim(),
+      });
+    }
+
+    if (description && description.trim().length > 0) {
+      await handlers.updateIssueDescription.execute({
+        issueId: issueIdParam,
+        projectId: id,
+        description: description.trim(),
+      });
+    }
+
+    return successResponse({ message: 'Issue updated successfully' });
   } catch (error) {
     return handleError(error);
   }
