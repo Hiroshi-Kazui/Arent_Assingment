@@ -267,8 +267,27 @@ npm run dev
 | application-engineer | Application（`src/application/`） | haiku | Command/Query ハンドラ・DTO・認可チェックの実装。Domain 集約を経由した Command と DB 直接読み取りの Query を分離する CQRS ルールを守る。 |
 | frontend-engineer | Presentation（`src/app/`） | sonnet | Next.js App Router ページ・UI コンポーネント・APS Viewer SDK 統合・API Route Handlers の実装。 |
 | doc-writer | ドキュメント（`README.md`、`docs/`） | sonnet | README・アーキテクチャ図・ER 図・API 設計書の作成・維持。ソースコードを読んで実装の実態を反映する。 |
-| phase-planner | 計画（実装不要） | - | 実装フェーズごとの計画書（`C:\Users\prove\.claude\plans\phase-{N}-plan.md`）を生成し、PM へのエージェントチーム指示プロンプトを出力する事前計画専門エージェント。コードは書かない。 |
-| project-manager | 統合・調整（メインセッション） | - | エージェントチームへのタスク割り当て・進捗管理・アーキテクチャ一貫性の守護・最終設計判断。 |
+| reviewer | 全レイヤー（読み取り専用） | sonnet | 仕様と実装のギャップ分析・コードレビュー・権限ルール監査。ファイルの変更は一切行わない。 |
+| project-manager | 統合・調整 | opus | `/team-dispatch` や `/impl-plan` スキルが出力した PM プロンプトを受け取り、TeamCreate でエージェントチームを組成・実行するオーケストレーター。 |
+
+### スキル（スラッシュコマンド）一覧
+
+`.claude/commands/` に定義したスキルで、PM の定型作業を自動化する。
+
+| コマンド | 概要 |
+|---------|------|
+| `/commit-push` | 未コミット変更を論理グループに分割し、Conventional Commits 形式でコミット＆プッシュ |
+| `/plan-phase N` | `doc/phase0_plan.md` の対象フェーズを読み、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
+| `/impl-plan [scope]` | 仕様と現在の実装を比較してギャップを分析し、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
+| `/team-dispatch [plan-file]` | 作業プランをエージェント別に分割し、Wave ごとの並行実行プランファイルと project-manager へのプロンプトを出力 |
+
+### 典型的なワークフロー
+
+```
+1. /impl-plan              → ギャップ分析 + 計画書生成 + PMプロンプト出力
+2. Agent(project-manager)  → TeamCreate でエージェントチームを組成・実行
+3. /commit-push            → 成果をコミット＆プッシュ
+```
 
 ### レイヤーとエージェントの1対1対応
 
