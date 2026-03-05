@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -282,7 +283,7 @@ export function IssueDetailPanel({
     ) {
       const errorMessage = '完了報告には是正後写真が1枚以上必要です';
       if (!options?.suppressErrorAlert) {
-        alert(errorMessage);
+        toast.error(errorMessage);
       }
       return { ok: false, error: errorMessage };
     }
@@ -316,7 +317,7 @@ export function IssueDetailPanel({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (!options?.suppressErrorAlert) {
-        alert('ステータス更新エラー: ' + errorMessage);
+        toast.error('ステータス更新エラー: ' + errorMessage);
       }
       return { ok: false, error: errorMessage };
     } finally {
@@ -375,7 +376,7 @@ export function IssueDetailPanel({
           uploadedRejectionPhotoIds.push(...uploadData.photos.map((p) => p.photoId));
         }
       } catch (err) {
-        alert('否認時写真のアップロードに失敗しました: ' + (err instanceof Error ? err.message : String(err)));
+        toast.error('否認時写真のアップロードに失敗しました: ' + (err instanceof Error ? err.message : String(err)));
         return;
       } finally {
         setUploading(false);
@@ -402,14 +403,14 @@ export function IssueDetailPanel({
         const rollbackSucceeded = rollbackResults.every(Boolean);
         await reloadIssue();
         if (rollbackSucceeded) {
-          alert(`ステータス変更に失敗したため、アップロード済み写真を取り消しました: ${statusResult.error}`);
+          toast.error(`ステータス変更に失敗したため、アップロード済み写真を取り消しました: ${statusResult.error}`);
         } else {
-          alert(`ステータス変更に失敗しました。写真の取り消しに失敗したものがあるため、再確認してください: ${statusResult.error}`);
+          toast.error(`ステータス変更に失敗しました。写真の取り消しに失敗したものがあるため、再確認してください: ${statusResult.error}`);
         }
         return;
       }
 
-      alert('ステータス更新エラー: ' + statusResult.error);
+      toast.error('ステータス更新エラー: ' + statusResult.error);
       return;
     }
 
@@ -434,7 +435,7 @@ export function IssueDetailPanel({
       onIssueUpdated?.();
       await reloadIssue();
     } catch (err) {
-      alert('担当者変更エラー: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('担当者変更エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setAssigneeUpdating(false);
     }
@@ -442,7 +443,7 @@ export function IssueDetailPanel({
 
   const handlePhotoUpload = async (phase: 'BEFORE' | 'AFTER', files: File[]) => {
     if (files.length === 0) {
-      alert('ファイルを選択してください');
+      toast.error('ファイルを選択してください');
       return;
     }
 
@@ -474,7 +475,7 @@ export function IssueDetailPanel({
 
       await reloadIssue();
     } catch (err) {
-      alert('アップロードエラー: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('アップロードエラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUploading(false);
     }
@@ -494,7 +495,7 @@ export function IssueDetailPanel({
       onIssueUpdated?.();
       onClose?.();
     } catch (err) {
-      alert('削除エラー: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('削除エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDeleting(false);
     }
@@ -543,7 +544,7 @@ export function IssueDetailPanel({
       const res = await fetch(`/api/photos/${photoId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || '削除に失敗しました');
+        toast.error(data.error || '削除に失敗しました');
         return;
       }
       // Issue データをリフレッシュ
@@ -553,7 +554,7 @@ export function IssueDetailPanel({
       setPhotoUrls(urls);
       onIssueUpdated?.();
     } catch {
-      alert('削除に失敗しました');
+      toast.error('削除に失敗しました');
     }
   };
 
@@ -573,7 +574,7 @@ export function IssueDetailPanel({
       setEditingTitle(false);
       onIssueUpdated?.();
     } catch {
-      alert('タイトルの更新に失敗しました');
+      toast.error('タイトルの更新に失敗しました');
     } finally {
       setTitleSaving(false);
     }
@@ -596,7 +597,7 @@ export function IssueDetailPanel({
       onIssueUpdated?.();
       await reloadIssue();
     } catch {
-      alert('説明の更新に失敗しました');
+      toast.error('説明の更新に失敗しました');
     } finally {
       setDescriptionSaving(false);
     }

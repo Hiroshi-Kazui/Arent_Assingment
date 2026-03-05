@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ProjectListPage() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [navigatingId, setNavigatingId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,10 +86,27 @@ export default function ProjectListPage() {
           <p className="text-muted-foreground text-center py-16">プロジェクトが見つかりません</p>
         ) : (
           <div className="space-y-4">
-            {projects.map((project) => (
+            {projects.map((project) => {
+              const isNavigating = navigatingId === project.projectId && isPending;
+              return (
               <div key={project.projectId} className="group">
-                <Link href={`/projects/${project.projectId}/viewer`} className="block">
-                  <Card className="bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm">
+                <button
+                  type="button"
+                  className="block w-full text-left"
+                  onClick={() => {
+                    setNavigatingId(project.projectId);
+                    startTransition(() => {
+                      router.push(`/projects/${project.projectId}/viewer`);
+                    });
+                  }}
+                  disabled={isPending}
+                >
+                  <Card className={`bg-neutral-900/40 hover:bg-neutral-900/80 border-neutral-800 hover:border-primary/50 transition-all shadow-sm relative ${isNavigating ? 'opacity-60' : ''}`}>
+                    {isNavigating && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-background/30">
+                        <div className="w-5 h-5 rounded-full border-2 border-muted-foreground border-t-primary animate-spin" />
+                      </div>
+                    )}
                     <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
                       <div>
                         <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
@@ -137,23 +157,10 @@ export default function ProjectListPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </Link>
-
-                {/* Quick access button */}
-                <div className="flex gap-2 mt-2 px-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    asChild
-                  >
-                    <Link href={`/projects/${project.projectId}/viewer`}>
-                      3Dビュー
-                    </Link>
-                  </Button>
-                </div>
+                </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

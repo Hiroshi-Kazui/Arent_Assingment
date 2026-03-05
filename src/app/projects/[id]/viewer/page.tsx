@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
 import { IssueDetailModal } from '@/app/components/issue-detail-modal';
 import { IssueMarkers, IssueMarker } from '@/app/components/viewer/issue-markers';
@@ -366,23 +367,23 @@ export default function ViewerPage({ params }: PageProps) {
   // フォーム送信
   const handleSubmitIssue = async () => {
     if (selectedDbId === null && selectedWorldPosition === null) {
-      alert('部材または空間を選択してください');
+      toast.error('部材または空間を選択してください');
       return;
     }
     if (!formTitle.trim() || !formDescription.trim()) {
-      alert('タイトルと説明を入力してください');
+      toast.error('タイトルと説明を入力してください');
       return;
     }
     if (formDueDate === undefined) {
-      alert('是正期限を入力してください');
+      toast.error('是正期限を入力してください');
       return;
     }
     if (!formFiles || formFiles.length === 0) {
-      alert('施工前写真を添付してください');
+      toast.error('施工前写真を添付してください');
       return;
     }
     if (!formFloorId) {
-      alert('フロアを選択してください');
+      toast.error('フロアを選択してください');
       return;
     }
 
@@ -444,7 +445,7 @@ export default function ViewerPage({ params }: PageProps) {
 
       await refreshIssues();
     } catch (err) {
-      alert('エラー: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSubmitting(false);
     }
@@ -608,6 +609,11 @@ export default function ViewerPage({ params }: PageProps) {
           {error ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-destructive">{error}</p>
+            </div>
+          ) : dataLoading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <div className="w-6 h-6 rounded-full border-2 border-muted-foreground border-t-primary animate-spin" />
+              <p className="text-muted-foreground text-sm">プロジェクトを読み込み中...</p>
             </div>
           ) : !modelUrn ? (
             <div className="flex items-center justify-center h-full p-4">
