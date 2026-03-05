@@ -281,12 +281,42 @@ npm run dev
 | `/impl-plan [scope]` | 仕様と現在の実装を比較してギャップを分析し、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
 | `/team-dispatch [plan-file]` | 作業プランをエージェント別に分割し、Wave ごとの並行実行プランファイルと project-manager へのプロンプトを出力 |
 
-### 典型的なワークフロー
+### 開発フロー
+
+全体の仕様・ドメインモデル・ADR は `doc/phase0_plan.md` に集約する。実装は以下の2パターンで進める。
+
+#### パターン A: ウォーターフォール（フェーズ順実装）
+
+`phase0_plan.md` に定義したフェーズ計画を順番に実装する。
 
 ```
-1. /impl-plan              → ギャップ分析 + 計画書生成 + PMプロンプト出力
+1. /plan-phase N           → フェーズ N の実装計画書を生成 + project-manager プロンプト出力
 2. Agent(project-manager)  → TeamCreate でエージェントチームを組成・実行
 3. /commit-push            → 成果をコミット＆プッシュ
+```
+
+#### パターン B: アジャイル（差分補完）
+
+`phase0_plan.md` に追記・変更が発生した場合、フェーズ番号によらず「何が足りないか」を起点に実装する。
+
+```
+1. /impl-plan [scope]      → 仕様と実装のギャップ分析 + 実装計画書生成 + project-manager プロンプト出力
+2. Agent(project-manager)  → TeamCreate でエージェントチームを組成・実行
+3. /commit-push            → 成果をコミット＆プッシュ
+```
+
+#### 重い計画書は /team-dispatch で分割
+
+どちらのパターンでも、計画書のスコープが大きい場合は `/team-dispatch` に渡すと AgentTeams 用の Wave 分割プランと project-manager プロンプトが生成される。
+
+```
+/plan-phase N または /impl-plan
+    ↓ 計画書（plan-file）
+/team-dispatch plan-file
+    ↓ Wave別分割プラン + project-manager プロンプト
+Agent(project-manager) → TeamCreate（Wave1 → Wave2 → ...）
+    ↓
+/commit-push
 ```
 
 ### レイヤーとエージェントの1対1対応
