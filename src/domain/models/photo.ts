@@ -35,7 +35,8 @@ export class Photo {
     readonly issueId: IssueId,
     readonly blobKey: string,
     readonly phase: PhotoPhase,
-    readonly uploadedAt: Date
+    readonly uploadedAt: Date,
+    readonly uploadedBy: string | null
   ) {}
 
   /**
@@ -45,13 +46,14 @@ export class Photo {
     id: PhotoId,
     issueId: IssueId,
     blobKey: string,
-    phase: PhotoPhase
+    phase: PhotoPhase,
+    uploadedBy: string | null
   ): Photo {
     if (!blobKey || blobKey.trim().length === 0) {
       throw new Error('Photo blobKey must not be empty');
     }
 
-    return new Photo(id, issueId, blobKey, phase, new Date());
+    return new Photo(id, issueId, blobKey, phase, new Date(), uploadedBy);
   }
 
   /**
@@ -62,9 +64,10 @@ export class Photo {
     issueId: IssueId,
     blobKey: string,
     phase: PhotoPhase,
-    uploadedAt: Date
+    uploadedAt: Date,
+    uploadedBy: string | null
   ): Photo {
-    return new Photo(id, issueId, blobKey, phase, uploadedAt);
+    return new Photo(id, issueId, blobKey, phase, uploadedAt, uploadedBy);
   }
 
   /**

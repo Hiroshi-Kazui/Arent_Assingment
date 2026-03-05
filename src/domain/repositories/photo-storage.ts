@@ -22,4 +22,10 @@ export interface PhotoStorage {
    * @returns 署名済み URL
    */
   getUrl(key: string): Promise<string>;
+
+  /**
+   * 写真ファイルを削除
+   * @param key - ファイルキー
+   */
+  delete(key: string): Promise<void>;
 }

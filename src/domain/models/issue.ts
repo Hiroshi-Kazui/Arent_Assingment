@@ -362,6 +362,31 @@ export class Issue {
   }
 
   /**
+   * 説明を変更
+   */
+  updateDescription(newDescription: string): Issue {
+    if (!newDescription || newDescription.trim().length === 0) {
+      throw new Error('Issue description must not be empty');
+    }
+    return new Issue(
+      this.id,
+      this.projectId,
+      this.floorId,
+      this.title,
+      newDescription.trim(),
+      this.issueType,
+      this.reportedBy,
+      this.location,
+      this.priority,
+      this.status,
+      this.dueDate,
+      this.createdAt,
+      new Date(),
+      this.assigneeId
+    );
+  }
+
+  /**
    * 優先度を変更
    */
   changePriority(newPriority: IssuePriority): Issue {
