@@ -182,6 +182,21 @@ describe('Issue - 状態遷移ロジック', () => {
       const issue = createTestIssue(IssueStatus.PointOut);
       expect(() => issue.startWork()).toThrow(InvalidStatusTransitionError);
     });
+
+    it('PointOut → Done は禁止（直接完了不可）', () => {
+      const issue = createTestIssue(IssueStatus.PointOut);
+      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
+    });
+
+    it('Confirmed → InProgress は禁止（reopenAfterCompletion不可）', () => {
+      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
+      expect(() => issue.reopenAfterCompletion()).toThrow(InvalidStatusTransitionError);
+    });
+
+    it('Confirmed → Done は禁止', () => {
+      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
+      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
+    });
   });
 
   describe('状態遷移時の属性保持', () => {
@@ -263,6 +278,48 @@ describe('Issue - 状態遷移ロジック', () => {
 
       expect(updatedIssue.priority).toBe(IssuePriority.Critical);
       expect(updatedIssue.status).toBe(IssueStatus.Open);
+    });
+  });
+
+  describe('完全ライフサイクル', () => {
+    it('PointOut → Open → InProgress → Done → Confirmed の全遷移', () => {
+      const issue = createTestIssue(IssueStatus.PointOut);
+      const assigneeId = UserId.create('assignee-001');
+
+      const open = issue.assignTo(assigneeId);
+      expect(open.status).toBe(IssueStatus.Open);
+
+      const inProgress = open.startWork();
+      expect(inProgress.status).toBe(IssueStatus.InProgress);
+
+      const done = inProgress.complete();
+      expect(done.status).toBe(IssueStatus.Done);
+
+      const confirmed = done.confirm();
+      expect(confirmed.status).toBe(IssueStatus.Confirmed);
+    });
+
+    it('差し戻しループ: Open → InProgress → Open → InProgress → Done', () => {
+      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
+
+      const inProgress1 = issue.startWork();
+      const rejected = inProgress1.rejectWork();
+      expect(rejected.status).toBe(IssueStatus.Open);
+
+      const inProgress2 = rejected.startWork();
+      const done = inProgress2.complete();
+      expect(done.status).toBe(IssueStatus.Done);
+    });
+
+    it('再指摘ループ: Done → Confirmed → Open → InProgress → Done', () => {
+      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
+
+      const reissued = issue.reissue();
+      expect(reissued.status).toBe(IssueStatus.Open);
+
+      const inProgress = reissued.startWork();
+      const done = inProgress.complete();
+      expect(done.status).toBe(IssueStatus.Done);
     });
   });
 
