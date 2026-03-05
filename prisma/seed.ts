@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -142,11 +144,70 @@ async function main() {
   });
   console.log('✓ Updated existing issues reported_by to supervisor user');
 
-  // ElementFloorMapping は Viewer 初回ロード時に BoundingBox ベースで自動生成される
-  // seed では作成しない
-  console.log('ℹ ElementFloorMapping: skipped (auto-generated on first viewer load)');
+  // floors.csv が存在する場合はインポート
+  const floorsCsvPath = path.join(process.cwd(), 'prisma', 'seeds', 'floors.csv');
+  if (existsSync(floorsCsvPath)) {
+    const rows = parseCSV(readFileSync(floorsCsvPath, 'utf-8'));
+    for (const row of rows) {
+      if (!row.floor_id) continue;
+      await prisma.floor.upsert({
+        where: { floor_id: row.floor_id },
+        update: {
+          name: row.name,
+          floor_number: parseInt(row.floor_number),
+          elevation: row.elevation ? parseFloat(row.elevation) : null,
+        },
+        create: {
+          floor_id: row.floor_id,
+          building_id: row.building_id,
+          name: row.name,
+          floor_number: parseInt(row.floor_number),
+          elevation: row.elevation ? parseFloat(row.elevation) : null,
+        },
+      });
+    }
+    console.log(`✓ Floors imported from CSV: ${rows.length} rows`);
+  } else {
+    console.log('ℹ floors.csv not found, skipping floor seed (auto-synced from APS on first viewer load)');
+  }
+
+  // element_floor_mapping.csv が存在する場合はインポート
+  const mappingCsvPath = path.join(process.cwd(), 'prisma', 'seeds', 'element_floor_mapping.csv');
+  if (existsSync(mappingCsvPath)) {
+    const rows = parseCSV(readFileSync(mappingCsvPath, 'utf-8'));
+    for (const row of rows) {
+      if (!row.building_id || !row.db_id || !row.floor_id) continue;
+      await prisma.elementFloorMapping.upsert({
+        where: { building_id_db_id: { building_id: row.building_id, db_id: parseInt(row.db_id) } },
+        update: {
+          floor_id: row.floor_id,
+          bounding_box_min_z: row.bounding_box_min_z ? parseFloat(row.bounding_box_min_z) : null,
+        },
+        create: {
+          building_id: row.building_id,
+          db_id: parseInt(row.db_id),
+          floor_id: row.floor_id,
+          bounding_box_min_z: row.bounding_box_min_z ? parseFloat(row.bounding_box_min_z) : null,
+        },
+      });
+    }
+    console.log(`✓ ElementFloorMappings imported from CSV: ${rows.length} rows`);
+  } else {
+    console.log('ℹ element_floor_mapping.csv not found, skipping mapping seed (auto-generated on first viewer load)');
+  }
 
   console.log('✅ Seeding completed successfully!');
+}
+
+function parseCSV(content: string): Record<string, string>[] {
+  const [headerLine, ...lines] = content.trim().split('\n');
+  const headers = headerLine.split(',').map((h) => h.trim());
+  return lines
+    .filter((l) => l.trim())
+    .map((line) => {
+      const values = line.split(',');
+      return Object.fromEntries(headers.map((h, i) => [h, (values[i] ?? '').trim()]));
+    });
 }
 
 main()

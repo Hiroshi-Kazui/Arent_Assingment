@@ -211,6 +211,13 @@ export function useFloorIsolation({
             } catch (e) {
               console.warn('[useFloorIsolation] Failed to persist:', e);
             } finally {
+              // CSV エクスポート（ローカル seed 用、失敗しても非致命的）
+              try {
+                await fetch(`/api/buildings/${buildingId}/export-seed-csv`, { method: 'POST' });
+                console.log('[useFloorIsolation] Exported seed CSVs');
+              } catch (e) {
+                console.warn('[useFloorIsolation] CSV export skipped (non-critical):', e);
+              }
               persistingRef.current = false;
             }
           })();
