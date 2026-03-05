@@ -99,6 +99,7 @@ model User {
   reported_issues Issue[] @relation("IssueReporter")
   assigned_issues Issue[] @relation("IssueAssignee")
   status_change_logs StatusChangeLog[] @relation("StatusChangeLogChanger")
+  uploaded_photos Photo[] @relation("PhotoUploader")
 
   @@map("user")
 }
@@ -139,8 +140,10 @@ model Photo {
   blob_key    String
   photo_phase String
   uploaded_at DateTime @default(now())
+  uploaded_by String?
 
-  issue Issue @relation(fields: [issue_id], references: [issue_id], onDelete: Cascade)
+  issue    Issue @relation(fields: [issue_id], references: [issue_id], onDelete: Cascade)
+  uploader User? @relation("PhotoUploader", fields: [uploaded_by], references: [user_id])
 
   @@map("photo")
 }

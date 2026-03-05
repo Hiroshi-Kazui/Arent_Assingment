@@ -15,6 +15,7 @@ export class PrismaPhotoRepository implements IPhotoRepository {
         blob_key: photo.blobKey,
         photo_phase: photo.phase,
         uploaded_at: photo.uploadedAt,
+        uploaded_by: photo.uploadedBy,
       },
     });
   }
@@ -31,8 +32,30 @@ export class PrismaPhotoRepository implements IPhotoRepository {
         IssueId.create(row.issue_id),
         row.blob_key,
         row.photo_phase as PhotoPhase,
-        row.uploaded_at
+        row.uploaded_at,
+        row.uploaded_by ?? null
       )
     );
+  }
+
+  async findById(id: PhotoId): Promise<Photo | null> {
+    const row = await prisma.photo.findUnique({
+      where: { photo_id: id },
+    });
+    if (!row) return null;
+    return Photo.reconstruct(
+      PhotoId.create(row.photo_id),
+      IssueId.create(row.issue_id),
+      row.blob_key,
+      row.photo_phase as PhotoPhase,
+      row.uploaded_at,
+      row.uploaded_by ?? null
+    );
+  }
+
+  async delete(id: PhotoId): Promise<void> {
+    await prisma.photo.delete({
+      where: { photo_id: id },
+    });
   }
 }

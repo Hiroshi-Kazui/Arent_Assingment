@@ -54,4 +54,8 @@ export class MinioPhotoStorage implements PhotoStorage {
       expirationSeconds
     );
   }
+
+  async delete(key: string): Promise<void> {
+    await minioClient.removeObject(this.bucketName, key);
+  }
 }
