@@ -19,7 +19,7 @@ export function AuthHeader() {
   return (
     <div className="flex items-center gap-3">
       {session.user.role === 'ADMIN' && (
-        <Link href="/admin" className="text-sm text-blue-600 hover:underline">
+        <Link href="/admin/organizations" className="text-sm text-blue-600 hover:underline">
           管理画面
         </Link>
       )}

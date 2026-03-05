@@ -7,7 +7,7 @@ import type { ViewerHit } from '@/app/components/viewer/use-viewer-interaction';
 interface ElementInfoPanelProps {
   viewer: Autodesk.Viewing.GuiViewer3D | null;
   element: ViewerHit | null;
-  onRegister: (element: ViewerHit) => void;
+  onRegister?: (element: ViewerHit) => void;
   onClose: () => void;
 }
 
@@ -177,14 +177,17 @@ export function ElementInfoPanel({
       )}
 
       <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          onClick={() => onRegister(element)}
-        >
-          指摘登録
-        </Button>
+        {onRegister && (
+          <Button
+            className="flex-1"
+            onClick={() => onRegister(element)}
+          >
+            指摘登録
+          </Button>
+        )}
         <Button
           variant="outline"
+          className={onRegister ? '' : 'flex-1'}
           onClick={onClose}
         >
           閉じる

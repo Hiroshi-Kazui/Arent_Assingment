@@ -65,8 +65,8 @@ export function IssueMarkers({
     overlayContainer.innerHTML = '';
 
     const colors: Record<string, string> = {
-      POINT_OUT: '#E53935',   // vivid red
-      OPEN: '#757575',        // gray
+      POINT_OUT: '#D32F2F',   // primary red
+      OPEN: '#FF9800',        // orange
       IN_PROGRESS: '#1E88E5', // sky blue
       DONE: '#43A047',        // light green
       CONFIRMED: '#00695C',   // deep teal

@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ApsViewer } from '@/app/components/viewer/aps-viewer';
@@ -56,12 +57,17 @@ interface Issue {
   worldPositionY?: number;
   worldPositionZ?: number;
   reportedBy: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  floorName?: string;
 }
 
 interface Project {
   projectId: string;
   name: string;
   buildingId: string;
+  branchId: string | null;
+  branchName: string | null;
   status: string;
   building: {
     buildingId: string;
@@ -87,8 +93,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_INLINE_STYLES: Record<string, React.CSSProperties> = {
-  POINT_OUT: { backgroundColor: '#E53935', color: '#fff', borderColor: 'transparent' },
-  OPEN: { backgroundColor: '#757575', color: '#fff', borderColor: 'transparent' },
+  POINT_OUT: { backgroundColor: '#D32F2F', color: '#fff', borderColor: 'transparent' },
+  OPEN: { backgroundColor: '#FF9800', color: '#fff', borderColor: 'transparent' },
   IN_PROGRESS: { backgroundColor: '#1E88E5', color: '#fff', borderColor: 'transparent' },
   DONE: { backgroundColor: '#43A047', color: '#fff', borderColor: 'transparent' },
   CONFIRMED: { backgroundColor: '#00695C', color: '#fff', borderColor: 'transparent' },
@@ -127,6 +133,9 @@ export default function ViewerPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const userRole = session?.user?.role;
+  const userId = session?.user?.id;
   const floorId = searchParams.get('floorId') ?? undefined;
   const highlightId = searchParams.get('highlightId');
 
@@ -218,8 +227,12 @@ export default function ViewerPage({ params }: PageProps) {
         const issuesRes = await fetch(issuesUrl);
         if (issuesRes.ok) {
           const issuesJson = await issuesRes.json();
-          const issuesData: Issue[] = issuesJson.items ?? issuesJson;
-          setIssues(issuesData);
+          const fetchedIssues: Issue[] = issuesJson.items ?? issuesJson;
+          const filteredIssues =
+            userRole === 'WORKER' && userId
+              ? fetchedIssues.filter((issue) => issue.assigneeId === userId)
+              : fetchedIssues;
+          setIssues(filteredIssues);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -236,19 +249,42 @@ export default function ViewerPage({ params }: PageProps) {
     }
 
     const target = issues.find((issue) => issue.issueId === highlightId);
-    if (!target?.dbId) {
-      return;
-    }
-
-    const dbId = Number.parseInt(target.dbId, 10);
-    if (Number.isNaN(dbId)) {
+    if (!target) {
       return;
     }
 
     try {
-      (viewer as any).select([dbId]);
-      (viewer as any).fitToView([dbId]);
+      // ダイアログを開かず、部材/空間をアップで表示するだけ
+      (viewer as any).clearSelection();
+      setDetailIssueId(null);
+
+      if (target.dbId) {
+        const dbId = Number.parseInt(target.dbId, 10);
+        if (!Number.isNaN(dbId)) {
+          (viewer as any).fitToView([dbId]);
+        }
+      } else if (target.worldPositionX != null && target.worldPositionY != null && target.worldPositionZ != null) {
+        const THREE = (window as any).THREE;
+        if (THREE) {
+          const pos = new THREE.Vector3(target.worldPositionX, target.worldPositionY, target.worldPositionZ);
+          const nav = (viewer as any).navigation;
+          if (nav) {
+            nav.setTarget(pos);
+            nav.setPosition(new THREE.Vector3(
+              target.worldPositionX + 5,
+              target.worldPositionY + 5,
+              target.worldPositionZ + 5
+            ));
+          }
+        }
+      }
+
       setHoveredIssueId(target.issueId);
+
+      // highlightId を URL から除去して issues 更新時の再実行を防止
+      const url = new URL(window.location.href);
+      url.searchParams.delete('highlightId');
+      router.replace(url.pathname + (url.search || ''), { scroll: false });
     } catch (err) {
       console.error('Failed to focus issue in viewer:', err);
     }
@@ -271,7 +307,12 @@ export default function ViewerPage({ params }: PageProps) {
     const res = await fetch(url);
     if (res.ok) {
       const json = await res.json();
-      setIssues(json.items ?? json);
+      const fetchedIssues: Issue[] = json.items ?? json;
+      const filteredIssues =
+        userRole === 'WORKER' && userId
+          ? fetchedIssues.filter((issue) => issue.assigneeId === userId)
+          : fetchedIssues;
+      setIssues(filteredIssues);
     }
   };
 
@@ -303,6 +344,7 @@ export default function ViewerPage({ params }: PageProps) {
 
   // 導線A: ダブルクリック/長押しで即時登録
   const handleQuickRegister = (hit: ViewerHit) => {
+    if (userRole === 'WORKER') return;
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
@@ -312,6 +354,7 @@ export default function ViewerPage({ params }: PageProps) {
 
   // 導線B: 情報パネルから登録
   const handleRegisterFromPanel = (hit: ViewerHit) => {
+    if (userRole === 'WORKER') return;
     setDetailIssueId(null);
     setSelectedDbId(hit.dbId);
     setSelectedWorldPosition(hit.worldPosition);
@@ -490,7 +533,12 @@ export default function ViewerPage({ params }: PageProps) {
               onClick={() => openDetailModal(issue.issueId)}
             >
               <div className="flex items-start justify-between gap-3 mb-2">
-                <p className={`text-sm font-medium transition-colors line-clamp-2 pr-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
+                <div className="min-w-0 pr-2">
+                  {issue.floorName && (
+                    <p className="text-[10px] text-muted-foreground mb-0.5">{issue.floorName}</p>
+                  )}
+                  <p className={`text-sm font-medium transition-colors line-clamp-2 ${hoveredIssueId === issue.issueId ? 'text-primary' : 'text-foreground/90 group-hover:text-primary'}`}>{issue.title}</p>
+                </div>
                 <Badge
                   variant="outline"
                   className="shrink-0 w-[64px] justify-center text-center text-[10px] whitespace-nowrap"
@@ -499,13 +547,16 @@ export default function ViewerPage({ params }: PageProps) {
                   {STATUS_LABELS[issue.status]}
                 </Badge>
               </div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground font-mono">
+              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                 {issue.issueType && (
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">{ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}</Badge>
                 )}
-                <span className={isOverdue ? 'text-destructive font-bold' : ''}>
+                <span className={`font-mono ${isOverdue ? 'text-destructive font-bold' : ''}`}>
                   {new Date(issue.dueDate).toLocaleDateString('ja-JP')}
                 </span>
+                {issue.assigneeName && (
+                  <span className="truncate max-w-[100px]" title={issue.assigneeName}>{issue.assigneeName}</span>
+                )}
               </div>
             </button>
           )})}
@@ -520,10 +571,29 @@ export default function ViewerPage({ params }: PageProps) {
       {/* Header */}
       <header className="bg-card border-b px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 shadow-sm z-10 w-full overflow-x-auto min-h-[56px]">
         <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0 whitespace-nowrap">
-          <Link href="/projects" className="hover:text-primary transition-colors">
-            プロジェクト一覧
-          </Link>
-          <span className="opacity-50">/</span>
+          {userRole === 'ADMIN' ? (
+            <>
+              <Link href="/admin/organizations" className="hover:text-primary transition-colors">
+                支店一覧
+              </Link>
+              <span className="opacity-50">/</span>
+              {project?.branchId && (
+                <>
+                  <Link href={`/admin/organizations/${project.branchId}`} className="hover:text-primary transition-colors">
+                    {project.branchName ?? '支店'}
+                  </Link>
+                  <span className="opacity-50">/</span>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <Link href="/projects" className="hover:text-primary transition-colors">
+                プロジェクト一覧
+              </Link>
+              <span className="opacity-50">/</span>
+            </>
+          )}
           <span className="text-foreground/80">{project?.name ?? id}</span>
         </div>
         <div className="ml-auto shrink-0">
@@ -608,7 +678,7 @@ export default function ViewerPage({ params }: PageProps) {
             <ElementInfoPanel
               viewer={viewer}
               element={selectedElement}
-              onRegister={handleRegisterFromPanel}
+              onRegister={userRole !== 'WORKER' ? handleRegisterFromPanel : undefined}
               onClose={clearSelection}
             />
           )}
@@ -641,10 +711,10 @@ export default function ViewerPage({ params }: PageProps) {
                 }}
                 className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
                   statusFilter.has(s)
-                    ? 'text-white border-transparent'
+                    ? 'border-transparent'
                     : 'hover:bg-muted'
                 }`}
-                style={statusFilter.has(s) ? { backgroundColor: STATUS_INLINE_STYLES[s]?.backgroundColor } : undefined}
+                style={statusFilter.has(s) ? STATUS_INLINE_STYLES[s] : undefined}
               >
                 {STATUS_LABELS[s]}
               </button>
@@ -706,7 +776,7 @@ export default function ViewerPage({ params }: PageProps) {
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 p-6">
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-5 px-1">
               {floors.length > 0 && (
                 <div>
@@ -850,7 +920,7 @@ export default function ViewerPage({ params }: PageProps) {
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="p-6 pt-4 border-t bg-muted/20 shrink-0 gap-2 sm:gap-0">
             <Button

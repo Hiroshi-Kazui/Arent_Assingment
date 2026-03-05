@@ -10,6 +10,7 @@ import { AuthHeader } from '@/app/components/auth-header';
 interface Project {
   projectId: string;
   name: string;
+  plan?: string;
   buildingId: string;
   status: string;
   issueCount: number;
@@ -111,6 +112,12 @@ export default function ProjectListPage() {
                             <span>期限:</span> <span className="text-foreground/80">{new Date(project.dueDate).toLocaleDateString('ja-JP')}</span>
                           </span>
                         )}
+                        {project.plan && (
+                          <span className="flex items-center gap-1.5">
+                            <span>計画:</span>
+                            <span className="text-foreground/80 truncate max-w-[200px]">{project.plan}</span>
+                          </span>
+                        )}
                       </div>
                       {/* Progress Bar */}
                       <div className="mt-3">
@@ -132,18 +139,8 @@ export default function ProjectListPage() {
                   </Card>
                 </Link>
 
-                {/* Quick access buttons below each card */}
+                {/* Quick access button */}
                 <div className="flex gap-2 mt-2 px-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    asChild
-                  >
-                    <Link href={`/projects/${project.projectId}/issues`}>
-                      指摘一覧
-                    </Link>
-                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ interface Photo {
   blobKey: string;
   photoPhase: 'BEFORE' | 'AFTER' | 'REJECTION';
   uploadedAt: string;
+  uploadedBy?: string;
 }
 
 interface StatusChangeLogEntry {
@@ -53,6 +55,7 @@ interface IssueDetail {
   worldPositionY?: number;
   worldPositionZ?: number;
   floorId: string;
+  floorName?: string;
   reportedBy: string;
   createdAt: string;
   photos: Photo[];
@@ -74,6 +77,8 @@ interface UserOption {
   role: string;
 }
 
+type StatusChangeResult = { ok: true } | { ok: false; error: string };
+
 const STATUS_LABELS: Record<string, string> = {
   POINT_OUT: '未割当',
   OPEN: '未対応',
@@ -83,8 +88,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_INLINE_STYLES: Record<string, React.CSSProperties> = {
-  POINT_OUT: { backgroundColor: '#E53935', color: '#fff', borderColor: 'transparent' },
-  OPEN: { backgroundColor: '#757575', color: '#fff', borderColor: 'transparent' },
+  POINT_OUT: { backgroundColor: '#D32F2F', color: '#fff', borderColor: 'transparent' },
+  OPEN: { backgroundColor: '#FF9800', color: '#fff', borderColor: 'transparent' },
   IN_PROGRESS: { backgroundColor: '#1E88E5', color: '#fff', borderColor: 'transparent' },
   DONE: { backgroundColor: '#43A047', color: '#fff', borderColor: 'transparent' },
   CONFIRMED: { backgroundColor: '#00695C', color: '#fff', borderColor: 'transparent' },
@@ -102,10 +107,9 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
 };
 
 const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsComment?: boolean }>> = {
-  POINT_OUT: [{ status: 'ASSIGN', label: '担当者を割り振る' }],
+  POINT_OUT: [],
   OPEN: [
     { status: 'IN_PROGRESS', label: '着手する' },
-    { status: 'ASSIGN', label: '担当者を変更' },
   ],
   IN_PROGRESS: [
     { status: 'DONE', label: '是正完了' },
@@ -114,26 +118,12 @@ const TRANSITIONS: Record<string, Array<{ status: string; label: string; needsCo
   DONE: [
     { status: 'CONFIRMED', label: '承認' },
     { status: 'OPEN', label: '否認', needsComment: true },
-    { status: 'ASSIGN', label: '担当者を変更' },
   ],
   CONFIRMED: [
     { status: 'OPEN', label: '再指摘', needsComment: true },
-    { status: 'ASSIGN', label: '担当者を変更' },
   ],
 };
 
-const TRANSITION_BUTTON_STYLES: Record<string, string> = {
-  IN_PROGRESS: '',
-  DONE: '',
-  CONFIRMED: 'text-white',
-  OPEN: 'text-white',
-  ASSIGN: '',
-};
-
-const TRANSITION_BUTTON_INLINE_STYLES: Record<string, React.CSSProperties> = {
-  CONFIRMED: { backgroundColor: '#00695C' },
-  OPEN: { backgroundColor: '#757575' },
-};
 
 const CAROUSEL_LAYOUT_CLASS = 'w-full px-10 sm:px-11';
 const CAROUSEL_ITEM_CLASS = 'pl-2 basis-3/4 sm:basis-2/5 md:basis-1/4';
@@ -171,6 +161,7 @@ export function IssueDetailPanel({
   onIssueUpdated,
   onClose,
 }: IssueDetailPanelProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -192,6 +183,8 @@ export function IssueDetailPanel({
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [commentModalTarget, setCommentModalTarget] = useState<string>('');
   const [commentText, setCommentText] = useState('');
+  const [commentPhotoFiles, setCommentPhotoFiles] = useState<File[]>([]);
+  const commentPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Title editing state
   const [editingTitle, setEditingTitle] = useState(false);
@@ -199,12 +192,13 @@ export function IssueDetailPanel({
   const [titleSaving, setTitleSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Assignee modal state
-  const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
+  // Description editing state
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [descriptionSaving, setDescriptionSaving] = useState(false);
+
+  // Assignee inline state
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersError, setUsersError] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState('');
   const [assigneeUpdating, setAssigneeUpdating] = useState(false);
 
   useEffect(() => {
@@ -248,6 +242,25 @@ export function IssueDetailPanel({
     };
   }, [issueId, projectId]);
 
+  // Fetch assignable users for inline dropdown (Admin/Supervisor only)
+  useEffect(() => {
+    if (!session || session.user.role === 'WORKER') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/assignable-users');
+        if (!res.ok || cancelled) return;
+        const data: Array<{ userId: string; name: string; role: string; activeIssueCount: number }> = await res.json();
+        if (!cancelled) {
+          setUsers(data.map((u) => ({ userId: u.userId, name: `${u.name} (${u.activeIssueCount})`, role: u.role })));
+        }
+      } catch {
+        // Ignore – dropdown will simply be empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
   const reloadIssue = async () => {
     const updated = await fetchIssue(projectId, issueId);
     setIssue(updated);
@@ -255,14 +268,23 @@ export function IssueDetailPanel({
     setPhotoUrls(urls);
   };
 
-  const handleStatusChange = async (newStatus: string, comment?: string) => {
-    if (!issue) return;
+  const handleStatusChange = async (
+    newStatus: string,
+    comment?: string,
+    options?: { suppressErrorAlert?: boolean }
+  ): Promise<StatusChangeResult> => {
+    if (!issue) {
+      return { ok: false, error: 'Issue not found' };
+    }
     if (
       newStatus === 'DONE' &&
       issue.photos.filter((p) => p.photoPhase === 'AFTER').length === 0
     ) {
-      alert('完了報告には是正後写真が1枚以上必要です');
-      return;
+      const errorMessage = '完了報告には是正後写真が1枚以上必要です';
+      if (!options?.suppressErrorAlert) {
+        alert(errorMessage);
+      }
+      return { ok: false, error: errorMessage };
     }
 
     try {
@@ -278,78 +300,141 @@ export function IssueDetailPanel({
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error ?? `Failed (${res.status})`);
+        let errorMessage = `Failed (${res.status})`;
+        try {
+          const errData = (await res.json()) as { error?: string };
+          errorMessage = errData.error ?? errorMessage;
+        } catch {
+          // Ignore parse error and keep fallback message.
+        }
+        throw new Error(errorMessage);
       }
 
       onIssueUpdated?.();
       await reloadIssue();
+      return { ok: true };
     } catch (err) {
-      alert('ステータス更新エラー: ' + (err instanceof Error ? err.message : String(err)));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (!options?.suppressErrorAlert) {
+        alert('ステータス更新エラー: ' + errorMessage);
+      }
+      return { ok: false, error: errorMessage };
     } finally {
       setStatusUpdating(false);
     }
   };
 
   const handleTransitionClick = (transition: { status: string; label: string; needsComment?: boolean }) => {
-    if (transition.status === 'ASSIGN') {
-      openAssigneeModal();
-      return;
-    }
     if (transition.needsComment) {
       setCommentModalTarget(transition.status);
       setCommentText('');
+      setCommentPhotoFiles([]);
+      if (commentPhotoInputRef.current) commentPhotoInputRef.current.value = '';
       setCommentModalOpen(true);
       return;
     }
-    handleStatusChange(transition.status);
+    void handleStatusChange(transition.status);
   };
 
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
+    if (!issue) return;
     if (!commentText.trim()) return;
-    setCommentModalOpen(false);
-    handleStatusChange(commentModalTarget, commentText.trim());
-  };
+    const isReissue = issue.status === 'CONFIRMED' && commentModalTarget === 'OPEN';
+    if (isReissue && commentPhotoFiles.length === 0) return;
 
-  const openAssigneeModal = async () => {
-    setAssigneeModalOpen(true);
-    setSelectedUserId('');
-    setUsersError(false);
+    const uploadedRejectionPhotoIds: string[] = [];
 
-    try {
-      setUsersLoading(true);
-      const res = await fetch('/api/assignable-users');
-      if (!res.ok) {
-        setUsersError(true);
+    if (isReissue) {
+      try {
+        setUploading(true);
+        const fd = new FormData();
+        for (const file of commentPhotoFiles) {
+          fd.append('files', file);
+        }
+        fd.append('photoPhase', 'REJECTION');
+
+        const uploadRes = await fetch(`/api/projects/${projectId}/issues/${issueId}/photos`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (!uploadRes.ok) {
+          let errorMessage = `Failed (${uploadRes.status})`;
+          try {
+            const errData = (await uploadRes.json()) as { error?: string };
+            errorMessage = errData.error ?? errorMessage;
+          } catch {
+            // Ignore parse error and keep fallback message.
+          }
+          throw new Error(errorMessage);
+        }
+
+        const uploadData = (await uploadRes.json()) as { photoIds?: string[]; photos?: Array<{ photoId: string }> };
+        if (Array.isArray(uploadData.photoIds)) {
+          uploadedRejectionPhotoIds.push(...uploadData.photoIds);
+        } else if (Array.isArray(uploadData.photos)) {
+          uploadedRejectionPhotoIds.push(...uploadData.photos.map((p) => p.photoId));
+        }
+      } catch (err) {
+        alert('否認時写真のアップロードに失敗しました: ' + (err instanceof Error ? err.message : String(err)));
+        return;
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    const statusResult = await handleStatusChange(
+      commentModalTarget,
+      commentText.trim(),
+      { suppressErrorAlert: true }
+    );
+    if (!statusResult.ok) {
+      if (uploadedRejectionPhotoIds.length > 0) {
+        const rollbackResults = await Promise.all(
+          uploadedRejectionPhotoIds.map(async (photoId) => {
+            try {
+              const deleteRes = await fetch(`/api/photos/${photoId}`, { method: 'DELETE' });
+              return deleteRes.ok;
+            } catch {
+              return false;
+            }
+          })
+        );
+        const rollbackSucceeded = rollbackResults.every(Boolean);
+        await reloadIssue();
+        if (rollbackSucceeded) {
+          alert(`ステータス変更に失敗したため、アップロード済み写真を取り消しました: ${statusResult.error}`);
+        } else {
+          alert(`ステータス変更に失敗しました。写真の取り消しに失敗したものがあるため、再確認してください: ${statusResult.error}`);
+        }
         return;
       }
-      const data: Array<{ userId: string; name: string; role: string; activeIssueCount: number }> = await res.json();
-      setUsers(data.map((u) => ({ userId: u.userId, name: `${u.name} (${u.activeIssueCount})`, role: u.role })));
-    } catch {
-      setUsersError(true);
-    } finally {
-      setUsersLoading(false);
+
+      alert('ステータス更新エラー: ' + statusResult.error);
+      return;
     }
+
+    setCommentModalOpen(false);
+    setCommentText('');
+    setCommentPhotoFiles([]);
+    if (commentPhotoInputRef.current) commentPhotoInputRef.current.value = '';
   };
 
-  const handleAssigneeSubmit = async () => {
-    if (!selectedUserId.trim()) return;
+  const handleAssigneeChange = async (userId: string) => {
     try {
       setAssigneeUpdating(true);
       const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/assignee`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assigneeId: selectedUserId.trim(), changedBy: session?.user?.id ?? '' }),
+        body: JSON.stringify({ assigneeId: userId, changedBy: session?.user?.id ?? '' }),
       });
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error ?? `Failed (${res.status})`);
       }
-      setAssigneeModalOpen(false);
       onIssueUpdated?.();
       await reloadIssue();
     } catch (err) {
-      alert('担当者割り振りエラー: ' + (err instanceof Error ? err.message : String(err)));
+      alert('担当者変更エラー: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setAssigneeUpdating(false);
     }
@@ -387,7 +472,6 @@ export function IssueDetailPanel({
         if (afterFileInputRef.current) afterFileInputRef.current.value = '';
       }
 
-      onIssueUpdated?.();
       await reloadIssue();
     } catch (err) {
       alert('アップロードエラー: ' + (err instanceof Error ? err.message : String(err)));
@@ -419,17 +503,21 @@ export function IssueDetailPanel({
   const beforePhotos = issue?.photos.filter((p) => p.photoPhase === 'BEFORE') ?? [];
   const afterPhotos = issue?.photos.filter((p) => p.photoPhase === 'AFTER') ?? [];
   const rejectionPhotos = issue?.photos.filter((p) => p.photoPhase === 'REJECTION') ?? [];
-  const showBeforeNavigation = beforePhotos.length >= 4;
-  const showAfterNavigation = afterPhotos.length >= 4;
-  const showRejectionNavigation = rejectionPhotos.length >= 4;
+  const userRole = session?.user?.role;
   const allTransitions = issue ? TRANSITIONS[issue.status] ?? [] : [];
   // 担当者以外はステータス変更不可。ただし DONE→承認/否認 は例外
   const currentUserId = session?.user?.id;
   const isAssignee = issue ? issue.assigneeId === currentUserId : false;
   const transitions = allTransitions.filter((t) => {
+    // CONFIRMED → 再指摘 は ADMIN/SUPERVISOR のみ
+    if (issue?.status === 'CONFIRMED') {
+      return userRole === 'ADMIN' || userRole === 'SUPERVISOR';
+    }
+    // DONE → 承認/否認 は ADMIN/SUPERVISOR のみ（担当者ワーカーにも非表示）
+    if (issue?.status === 'DONE' && (t.status === 'CONFIRMED' || t.status === 'OPEN')) {
+      return userRole === 'ADMIN' || userRole === 'SUPERVISOR';
+    }
     if (isAssignee) return true;
-    if (issue?.status === 'DONE' && (t.status === 'CONFIRMED' || t.status === 'OPEN')) return true;
-    if (t.status === 'ASSIGN') return true;
     return false;
   });
   const isOverdue = issue
@@ -437,9 +525,37 @@ export function IssueDetailPanel({
       new Date(issue.dueDate).setHours(0, 0, 0, 0) <=
         new Date().setHours(0, 0, 0, 0)
     : false;
+  const isReissueComment = commentModalTarget === 'OPEN' && issue?.status === 'CONFIRMED';
 
-  const userRole = session?.user?.role;
   const canEditTitle = userRole === 'ADMIN' || userRole === 'SUPERVISOR';
+
+  const canDeletePhoto = (photo: Photo): boolean => {
+    if (!session?.user) return false;
+    const role = session.user.role;
+    if (role === 'ADMIN' || role === 'SUPERVISOR') return true;
+    // Worker: 自分がアップロードした写真のみ
+    return photo.uploadedBy === session.user.id;
+  };
+
+  const handlePhotoDelete = async (photoId: string) => {
+    if (!confirm('この写真を削除しますか？')) return;
+    try {
+      const res = await fetch(`/api/photos/${photoId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '削除に失敗しました');
+        return;
+      }
+      // Issue データをリフレッシュ
+      const issueData = await fetchIssue(projectId, issueId);
+      const urls = await fetchPhotoUrls(issueData.photos);
+      setIssue(issueData);
+      setPhotoUrls(urls);
+      onIssueUpdated?.();
+    } catch {
+      alert('削除に失敗しました');
+    }
+  };
 
   const handleTitleSave = async () => {
     if (!issue || !titleDraft.trim() || titleDraft.trim() === issue.title) {
@@ -463,6 +579,29 @@ export function IssueDetailPanel({
     }
   };
 
+  const handleDescriptionSave = async () => {
+    if (!issue || descriptionDraft.trim() === issue.description) {
+      setEditingDescription(false);
+      return;
+    }
+    setDescriptionSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: descriptionDraft.trim() }),
+      });
+      if (!res.ok) throw new Error('Failed to update description');
+      setEditingDescription(false);
+      onIssueUpdated?.();
+      await reloadIssue();
+    } catch {
+      alert('説明の更新に失敗しました');
+    } finally {
+      setDescriptionSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -481,18 +620,40 @@ export function IssueDetailPanel({
 
   return (
     <div className="pb-6">
-      <div className="flex flex-wrap items-center gap-2 pb-4">
-        <Badge variant="outline" style={STATUS_INLINE_STYLES[issue.status]}>
+      <div className="flex items-center justify-between gap-2 pb-4">
+        <Badge variant="outline" className="text-base px-4 py-1.5" style={STATUS_INLINE_STYLES[issue.status]}>
           {STATUS_LABELS[issue.status]}
         </Badge>
-        {issue.issueType && (
-          <Badge variant="outline">
-            {ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}
-          </Badge>
+        {transitions.length > 0 && (
+          <div className="flex flex-wrap justify-end gap-2">
+            {transitions.map((t) => (
+              <Button
+                key={t.status}
+                variant="default"
+                size="sm"
+                disabled={statusUpdating}
+                className="text-white"
+                style={{ backgroundColor: STATUS_INLINE_STYLES[t.status]?.backgroundColor }}
+                onClick={() => handleTransitionClick(t)}
+              >
+                {t.label}
+              </Button>
+            ))}
+          </div>
         )}
       </div>
 
       <div className="border-t pt-4 space-y-4 text-sm">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary" className="text-[10px]">
+            {issue.locationType === 'dbId' ? `部材 (dbId: ${issue.dbId})` : '空間指摘'}
+          </Badge>
+          {issue.floorName && (
+            <Badge variant="outline" className="text-[10px]">
+              {issue.floorName}
+            </Badge>
+          )}
+        </div>
         <div>
           <p className="text-muted-foreground mb-1">タイトル</p>
           {editingTitle ? (
@@ -528,17 +689,77 @@ export function IssueDetailPanel({
               </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <p className="font-medium">{issue.title}</p>
+            <>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{issue.title}</p>
+                {canEditTitle && (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="タイトルを編集"
+                    onClick={() => {
+                      setTitleDraft(issue.title);
+                      setEditingTitle(true);
+                      setTimeout(() => titleInputRef.current?.focus(), 0);
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                  </button>
+                )}
+              </div>
+              {issue.issueType && (
+                <Badge variant="outline" className="mt-1">
+                  {ISSUE_TYPE_LABELS[issue.issueType] ?? issue.issueType}
+                </Badge>
+              )}
+            </>
+          )}
+        </div>
+        <div>
+          <p className="text-muted-foreground mb-1">説明</p>
+          {editingDescription ? (
+            <div className="space-y-2">
+              <Textarea
+                value={descriptionDraft}
+                onChange={(e) => setDescriptionDraft(e.target.value)}
+                disabled={descriptionSaving}
+                rows={4}
+                className="resize-none text-sm"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-xs"
+                  disabled={descriptionSaving}
+                  onClick={handleDescriptionSave}
+                >
+                  保存
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-xs"
+                  disabled={descriptionSaving}
+                  onClick={() => setEditingDescription(false)}
+                >
+                  取消
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2">
+              <p className="whitespace-pre-wrap bg-muted/30 p-3 rounded-md border flex-1">
+                {issue.description}
+              </p>
               {canEditTitle && (
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  title="タイトルを編集"
+                  className="text-muted-foreground hover:text-foreground transition-colors mt-3 shrink-0"
+                  title="説明を編集"
                   onClick={() => {
-                    setTitleDraft(issue.title);
-                    setEditingTitle(true);
-                    setTimeout(() => titleInputRef.current?.focus(), 0);
+                    setDescriptionDraft(issue.description);
+                    setEditingDescription(true);
                   }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
@@ -546,12 +767,6 @@ export function IssueDetailPanel({
               )}
             </div>
           )}
-        </div>
-        <div>
-          <p className="text-muted-foreground mb-1">説明</p>
-          <p className="whitespace-pre-wrap bg-muted/30 p-3 rounded-md border">
-            {issue.description}
-          </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -561,67 +776,56 @@ export function IssueDetailPanel({
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">位置種別</p>
-            <p>{issue.locationType === 'dbId' ? '部材情報' : '空間情報'}</p>
+            <p className="text-muted-foreground text-xs">担当者</p>
+            {userRole === 'WORKER' ? (
+              <p>{issue.assigneeName ?? '未割当'}</p>
+            ) : (
+              <Select
+                value={issue.assigneeId ?? '__none__'}
+                onValueChange={(val) => {
+                  if (val === '__none__') return;
+                  if (val !== issue.assigneeId) handleAssigneeChange(val);
+                }}
+                disabled={assigneeUpdating}
+              >
+                <SelectTrigger className="h-8 text-sm mt-1">
+                  <SelectValue placeholder="担当者を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">未割当</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.userId} value={u.userId}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          {issue.dbId && (
-            <div>
-              <p className="text-muted-foreground text-xs">部材 ID (dbId)</p>
-              <Badge variant="secondary" className="font-mono mt-1">
-                {issue.dbId}
-              </Badge>
-            </div>
-          )}
-          {issue.assigneeName && (
-            <div>
-              <p className="text-muted-foreground text-xs">担当者</p>
-              <p>{issue.assigneeName}</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Status transition buttons */}
-      <div className="border-t pt-4 mt-4">
-        <p className="text-sm font-semibold mb-3">ステータス変更</p>
-        <div className="flex gap-2 flex-wrap items-center">
-          <Badge variant="outline" className="text-[11px]" style={STATUS_INLINE_STYLES[issue.status]}>
-            現在: {STATUS_LABELS[issue.status]}
-          </Badge>
-          {transitions.map((t) => (
+          <div className="col-span-full mt-2">
             <Button
-              key={t.status}
-              variant={t.needsComment ? 'outline' : 'default'}
+              variant="outline"
               size="sm"
-              disabled={statusUpdating}
-              className={TRANSITION_BUTTON_STYLES[t.status] ?? ''}
-              style={TRANSITION_BUTTON_INLINE_STYLES[t.status]}
-              onClick={() => handleTransitionClick(t)}
+              className="w-full"
+              onClick={() => {
+                onClose?.();
+                router.push(`/projects/${projectId}/viewer?highlightId=${issueId}`);
+              }}
             >
-              {t.label}
+              3Dビューで位置を確認
             </Button>
-          ))}
-        </div>
-        <div className="mt-3 flex gap-2 flex-wrap">
-          <Badge variant="outline" className="text-[11px]">
-            是正前: {beforePhotos.length}枚
-          </Badge>
-          <Badge variant="outline" className="text-[11px]">
-            是正後: {afterPhotos.length}枚
-          </Badge>
-          {rejectionPhotos.length > 0 && (
-            <Badge variant="outline" className="text-[11px]" style={{ borderColor: '#E53935', color: '#E53935' }}>
-              否認時: {rejectionPhotos.length}枚
-            </Badge>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Status change log */}
+      {/* Status change log (collapsible) */}
       {issue.statusChangeLogs && issue.statusChangeLogs.length > 0 && (
-        <div className="border-t pt-4 mt-4">
-          <p className="text-sm font-semibold mb-3">変更履歴</p>
-          <div className="space-y-2">
+        <details className="border-t pt-4 mt-4 group">
+          <summary className="text-sm font-semibold cursor-pointer list-none flex items-center gap-1 select-none">
+            変更履歴
+            <svg className="w-4 h-4 transition-transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div className="space-y-2 mt-3">
             {issue.statusChangeLogs.map((log) => (
               <div key={log.logId} className="text-xs border-l-2 pl-3 py-1">
                 <div className="flex items-center gap-2">
@@ -631,11 +835,11 @@ export function IssueDetailPanel({
                   <span className="font-medium">{log.changedByName}</span>
                 </div>
                 <div>
-                  <Badge variant="outline" className="text-[10px] mr-1">
+                  <Badge variant="outline" className="text-[10px] mr-1" style={STATUS_INLINE_STYLES[log.fromStatus]}>
                     {STATUS_LABELS[log.fromStatus] ?? log.fromStatus}
                   </Badge>
                   →
-                  <Badge variant="outline" className="text-[10px] ml-1">
+                  <Badge variant="outline" className="text-[10px] ml-1" style={STATUS_INLINE_STYLES[log.toStatus]}>
                     {STATUS_LABELS[log.toStatus] ?? log.toStatus}
                   </Badge>
                 </div>
@@ -647,7 +851,7 @@ export function IssueDetailPanel({
               </div>
             ))}
           </div>
-        </div>
+        </details>
       )}
 
       <div className="border-t pt-4 mt-4 space-y-6">
@@ -665,15 +869,14 @@ export function IssueDetailPanel({
                       url={photoUrls[photo.photoId]}
                       onClick={() => {
                         const selectedUrl = photoUrls[photo.photoId];
-                        if (selectedUrl) {
-                          setLightboxUrl(selectedUrl);
-                        }
+                        if (selectedUrl) setLightboxUrl(selectedUrl);
                       }}
+                      onDelete={canDeletePhoto(photo) ? () => handlePhotoDelete(photo.photoId) : undefined}
                     />
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              {showBeforeNavigation && (
+              {beforePhotos.length >= 4 && (
                 <>
                   <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
                   <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
@@ -695,15 +898,14 @@ export function IssueDetailPanel({
                       url={photoUrls[photo.photoId]}
                       onClick={() => {
                         const selectedUrl = photoUrls[photo.photoId];
-                        if (selectedUrl) {
-                          setLightboxUrl(selectedUrl);
-                        }
+                        if (selectedUrl) setLightboxUrl(selectedUrl);
                       }}
+                      onDelete={canDeletePhoto(photo) ? () => handlePhotoDelete(photo.photoId) : undefined}
                     />
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              {showAfterNavigation && (
+              {afterPhotos.length >= 4 && (
                 <>
                   <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
                   <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
@@ -725,15 +927,14 @@ export function IssueDetailPanel({
                       url={photoUrls[photo.photoId]}
                       onClick={() => {
                         const selectedUrl = photoUrls[photo.photoId];
-                        if (selectedUrl) {
-                          setLightboxUrl(selectedUrl);
-                        }
+                        if (selectedUrl) setLightboxUrl(selectedUrl);
                       }}
+                      onDelete={canDeletePhoto(photo) ? () => handlePhotoDelete(photo.photoId) : undefined}
                     />
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              {showRejectionNavigation && (
+              {rejectionPhotos.length >= 4 && (
                 <>
                   <CarouselPrevious className={`left-0 ${CAROUSEL_NAV_CLASS}`} />
                   <CarouselNext className={`right-0 ${CAROUSEL_NAV_CLASS}`} />
@@ -842,11 +1043,7 @@ export function IssueDetailPanel({
       {/* Lightbox dialog */}
       <Dialog
         open={lightboxUrl !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setLightboxUrl(null);
-          }
-        }}
+        onOpenChange={(open) => { if (!open) setLightboxUrl(null); }}
       >
         <DialogContent className="sm:max-w-3xl p-2 bg-black/90 border-none">
           <DialogTitle className="sr-only">拡大写真</DialogTitle>
@@ -861,7 +1058,16 @@ export function IssueDetailPanel({
       </Dialog>
 
       {/* Comment modal (for 否認/再指摘) */}
-      <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
+      <Dialog
+        open={commentModalOpen}
+        onOpenChange={(open) => {
+          setCommentModalOpen(open);
+          if (!open) {
+            setCommentPhotoFiles([]);
+            if (commentPhotoInputRef.current) commentPhotoInputRef.current.value = '';
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>コメントを入力</DialogTitle>
@@ -873,13 +1079,34 @@ export function IssueDetailPanel({
             rows={4}
             className="resize-none"
           />
+          {isReissueComment && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">再指摘には否認時写真が1枚以上必要です</p>
+              <Input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                multiple
+                ref={commentPhotoInputRef}
+                onChange={(e) => setCommentPhotoFiles(Array.from(e.target.files ?? []))}
+                disabled={uploading || statusUpdating}
+              />
+              {commentPhotoFiles.length > 0 && (
+                <p className="text-[11px] text-muted-foreground">{commentPhotoFiles.length}枚選択中</p>
+              )}
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setCommentModalOpen(false)}>
               キャンセル
             </Button>
             <Button
               onClick={handleCommentSubmit}
-              disabled={!commentText.trim()}
+              disabled={
+                !commentText.trim() ||
+                (isReissueComment && commentPhotoFiles.length === 0) ||
+                uploading ||
+                statusUpdating
+              }
             >
               送信
             </Button>
@@ -887,51 +1114,6 @@ export function IssueDetailPanel({
         </DialogContent>
       </Dialog>
 
-      {/* Assignee modal */}
-      <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>担当者を割り振る</DialogTitle>
-          </DialogHeader>
-          {usersLoading ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">読み込み中...</p>
-          ) : usersError || users.length === 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">ユーザーIDを入力してください</p>
-              <Input
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                placeholder="ユーザーID"
-                disabled={assigneeUpdating}
-              />
-            </div>
-          ) : (
-            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={assigneeUpdating}>
-              <SelectTrigger>
-                <SelectValue placeholder="担当者を選択" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.userId} value={u.userId}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setAssigneeModalOpen(false)} disabled={assigneeUpdating}>
-              キャンセル
-            </Button>
-            <Button
-              onClick={handleAssigneeSubmit}
-              disabled={!selectedUserId.trim() || assigneeUpdating}
-            >
-              {assigneeUpdating ? '割り振り中...' : '割り振る'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -940,10 +1122,12 @@ function PhotoCard({
   photo,
   url,
   onClick,
+  onDelete,
 }: {
   photo: Photo;
   url?: string;
   onClick?: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <div
@@ -960,6 +1144,19 @@ function PhotoCard({
               {photo.blobKey.split('/').pop()}
             </span>
           </div>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+              title="写真を削除"
+            >
+              ×
+            </button>
+          )}
         </>
       ) : (
         <div className="flex flex-col items-center gap-2">

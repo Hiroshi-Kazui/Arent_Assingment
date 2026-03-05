@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Dialog,
@@ -14,6 +15,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { AuthHeader } from '@/app/components/auth-header';
 
 interface OrganizationDto {
@@ -27,6 +33,7 @@ interface OrganizationDto {
 interface ProjectListItemDto {
   projectId: string;
   name: string;
+  plan: string;
   buildingId: string;
   branchId: string;
   status: string;
@@ -82,6 +89,7 @@ export default function OrganizationDetailPage({
 }) {
   const { orgId } = use(params);
   const { data: session, status } = useSession();
+  const router = useRouter();
 
   const [org, setOrg] = useState<OrganizationDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,11 +104,13 @@ export default function OrganizationDetailPage({
   const [createForm, setCreateForm] = useState({
     name: '',
     plan: '',
-    startDate: '',
-    dueDate: '',
+    startDate: undefined as Date | undefined,
+    dueDate: undefined as Date | undefined,
     status: 'PLANNING',
     buildingId: '',
   });
+  const [createCalStartOpen, setCreateCalStartOpen] = useState(false);
+  const [createCalDueOpen, setCreateCalDueOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -109,10 +119,12 @@ export default function OrganizationDetailPage({
   const [editForm, setEditForm] = useState({
     name: '',
     plan: '',
-    startDate: '',
-    dueDate: '',
+    startDate: undefined as Date | undefined,
+    dueDate: undefined as Date | undefined,
     status: 'PLANNING',
   });
+  const [editCalStartOpen, setEditCalStartOpen] = useState(false);
+  const [editCalDueOpen, setEditCalDueOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -235,8 +247,8 @@ export default function OrganizationDetailPage({
         body: JSON.stringify({
           name: createForm.name.trim(),
           plan: createForm.plan.trim() || undefined,
-          startDate: createForm.startDate,
-          dueDate: createForm.dueDate,
+          startDate: format(createForm.startDate, 'yyyy-MM-dd'),
+          dueDate: format(createForm.dueDate, 'yyyy-MM-dd'),
           buildingId: createForm.buildingId,
           branchId: orgId,
         }),
@@ -246,7 +258,7 @@ export default function OrganizationDetailPage({
         setCreateError(data.error ?? '作成に失敗しました');
       } else {
         setShowCreateProject(false);
-        setCreateForm({ name: '', plan: '', startDate: '', dueDate: '', status: 'PLANNING', buildingId: '' });
+        setCreateForm({ name: '', plan: '', startDate: undefined, dueDate: undefined, status: 'PLANNING', buildingId: '' });
         fetchProjects();
       }
     } catch {
@@ -267,8 +279,8 @@ export default function OrganizationDetailPage({
         body: JSON.stringify({
           name: editForm.name.trim(),
           plan: editForm.plan.trim() || undefined,
-          startDate: editForm.startDate,
-          dueDate: editForm.dueDate,
+          startDate: format(editForm.startDate, 'yyyy-MM-dd'),
+          dueDate: format(editForm.dueDate, 'yyyy-MM-dd'),
           status: editForm.status,
         }),
       });
@@ -358,9 +370,10 @@ export default function OrganizationDetailPage({
   const buildingMap = Object.fromEntries(buildings.map((b) => [b.buildingId, b.name]));
   const orgMap = Object.fromEntries(orgs.map((o) => [o.organizationId, o.name]));
 
-  const toDateInput = (dateStr: string) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toISOString().split('T')[0];
+  const truncatePlan = (plan: string, maxLength = 30) => {
+    const normalized = plan?.trim() ?? '';
+    if (!normalized) return '-';
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
   };
 
   return (
@@ -370,8 +383,6 @@ export default function OrganizationDetailPage({
           <div>
             <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              <Link href="/admin" className="hover:underline">管理ダッシュボード</Link>
-              {' / '}
               <Link href="/admin/organizations" className="hover:underline">支部管理</Link>
               {' / '}
               {org?.name ?? orgId}
@@ -404,8 +415,8 @@ export default function OrganizationDetailPage({
                   setCreateForm({
                     name: '',
                     plan: '',
-                    startDate: '',
-                    dueDate: '',
+                    startDate: undefined,
+                    dueDate: undefined,
                     status: 'PLANNING',
                     buildingId: buildings[0]?.buildingId ?? '',
                   });
@@ -421,10 +432,12 @@ export default function OrganizationDetailPage({
               <p className="text-muted-foreground text-sm">読み込み中...</p>
             ) : (
               <div className="rounded-lg border border-neutral-800 overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
+                <table className="w-full text-sm min-w-[960px]">
                   <thead className="bg-neutral-900/60">
                     <tr>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">プロジェクト名</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">計画</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">指摘件数</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">ステータス</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">開始日</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">完了予定日</th>
@@ -438,19 +451,13 @@ export default function OrganizationDetailPage({
                       <tr
                         key={project.projectId}
                         className="hover:bg-neutral-900/30 transition-colors cursor-pointer"
-                        onClick={() => {
-                          setEditProject(project);
-                          setEditForm({
-                            name: project.name,
-                            plan: '',
-                            startDate: toDateInput(project.startDate),
-                            dueDate: toDateInput(project.dueDate),
-                            status: project.status,
-                          });
-                          setEditError(null);
-                        }}
+                        onClick={() => router.push(`/projects/${project.projectId}/viewer`)}
                       >
                         <td className="px-4 py-3 font-medium">{project.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground" title={project.plan || undefined}>
+                          {truncatePlan(project.plan)}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{project.issueCount}</td>
                         <td className="px-4 py-3">
                           <Badge variant={STATUS_VARIANTS[project.status] ?? 'secondary'}>
                             {STATUS_LABELS[project.status] ?? project.status}
@@ -477,30 +484,37 @@ export default function OrganizationDetailPage({
                           {buildingMap[project.buildingId] ?? project.buildingId}
                         </td>
                         <td className="px-4 py-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditProject(project);
-                              setEditForm({
-                                name: project.name,
-                                plan: '',
-                                startDate: toDateInput(project.startDate),
-                                dueDate: toDateInput(project.dueDate),
-                                status: project.status,
-                              });
-                              setEditError(null);
-                            }}
-                          >
-                            編集
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/projects/${project.projectId}/viewer`} onClick={(e) => e.stopPropagation()}>
+                                3Dビュー
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditProject(project);
+                                setEditForm({
+                                  name: project.name,
+                                  plan: project.plan,
+                                  startDate: project.startDate ? new Date(project.startDate) : undefined,
+                                  dueDate: project.dueDate ? new Date(project.dueDate) : undefined,
+                                  status: project.status,
+                                });
+                                setEditError(null);
+                              }}
+                            >
+                              編集
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                     {projects.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                           プロジェクトがありません
                         </td>
                       </tr>
@@ -629,21 +643,47 @@ export default function OrganizationDetailPage({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1 block">開始日</label>
-                <Input
-                  type="date"
-                  value={createForm.startDate}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, startDate: e.target.value }))}
-                  disabled={createLoading}
-                />
+                <Popover open={createCalStartOpen} onOpenChange={setCreateCalStartOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={createLoading}
+                      className={cn('w-full justify-start text-left font-normal', !createForm.startDate && 'text-muted-foreground')}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {createForm.startDate ? format(createForm.startDate, 'yyyy/MM/dd') : '日付を選択'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={createForm.startDate}
+                      onSelect={(date) => { setCreateForm((f) => ({ ...f, startDate: date })); setCreateCalStartOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">完了予定日</label>
-                <Input
-                  type="date"
-                  value={createForm.dueDate}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, dueDate: e.target.value }))}
-                  disabled={createLoading}
-                />
+                <Popover open={createCalDueOpen} onOpenChange={setCreateCalDueOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={createLoading}
+                      className={cn('w-full justify-start text-left font-normal', !createForm.dueDate && 'text-muted-foreground')}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {createForm.dueDate ? format(createForm.dueDate, 'yyyy/MM/dd') : '日付を選択'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={createForm.dueDate}
+                      onSelect={(date) => { setCreateForm((f) => ({ ...f, dueDate: date })); setCreateCalDueOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div>
@@ -713,21 +753,47 @@ export default function OrganizationDetailPage({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1 block">開始日</label>
-                <Input
-                  type="date"
-                  value={editForm.startDate}
-                  onChange={(e) => setEditForm((f) => ({ ...f, startDate: e.target.value }))}
-                  disabled={editLoading}
-                />
+                <Popover open={editCalStartOpen} onOpenChange={setEditCalStartOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={editLoading}
+                      className={cn('w-full justify-start text-left font-normal', !editForm.startDate && 'text-muted-foreground')}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editForm.startDate ? format(editForm.startDate, 'yyyy/MM/dd') : '日付を選択'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editForm.startDate}
+                      onSelect={(date) => { setEditForm((f) => ({ ...f, startDate: date })); setEditCalStartOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">完了予定日</label>
-                <Input
-                  type="date"
-                  value={editForm.dueDate}
-                  onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
-                  disabled={editLoading}
-                />
+                <Popover open={editCalDueOpen} onOpenChange={setEditCalDueOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={editLoading}
+                      className={cn('w-full justify-start text-left font-normal', !editForm.dueDate && 'text-muted-foreground')}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editForm.dueDate ? format(editForm.dueDate, 'yyyy/MM/dd') : '日付を選択'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editForm.dueDate}
+                      onSelect={(date) => { setEditForm((f) => ({ ...f, dueDate: date })); setEditCalDueOpen(false); }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div>

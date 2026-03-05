@@ -19,6 +19,7 @@ interface OrganizationDto {
   name: string;
   type: 'HEADQUARTERS' | 'BRANCH';
   userCount: number;
+  projectCount: number;
   createdAt: string;
 }
 
@@ -168,8 +169,7 @@ export default function OrganizationsPage() {
           <div>
             <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              <Link href="/admin" className="hover:underline">管理ダッシュボード</Link>
-              {' / '}支部管理
+              支部管理
             </p>
           </div>
           <AuthHeader />
@@ -194,6 +194,7 @@ export default function OrganizationsPage() {
               <tr>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">組織名</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">タイプ</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">プロジェクト数</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">ユーザー数</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">作成日</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">操作</th>
@@ -213,6 +214,7 @@ export default function OrganizationsPage() {
                   <td className="px-4 py-3 text-muted-foreground">
                     {org.type === 'HEADQUARTERS' ? '本部' : '支部'}
                   </td>
+                  <td className="px-4 py-3 text-muted-foreground">{org.projectCount}</td>
                   <td className="px-4 py-3 text-muted-foreground">{org.userCount}</td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {new Date(org.createdAt).toLocaleDateString('ja-JP')}
@@ -248,7 +250,7 @@ export default function OrganizationsPage() {
               ))}
               {orgs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     組織が見つかりません
                   </td>
                 </tr>

@@ -188,7 +188,7 @@ export default function UsersPage() {
           <div>
             <h1 className="text-xl font-semibold text-foreground">指摘管理ツール</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              <Link href="/admin" className="hover:underline">管理ダッシュボード</Link>
+              <Link href="/admin/organizations" className="hover:underline">支部管理</Link>
               {' / '}ユーザー管理
             </p>
           </div>
