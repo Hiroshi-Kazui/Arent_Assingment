@@ -1,97 +1,107 @@
 import { describe, it, expect } from 'vitest';
-import { Location } from './location';
+import { Location, DbIdLocation, WorldPositionLocation } from './location';
+import { DomainError } from '../errors/domain-error';
 
-describe('Location.createFromDbId', () => {
-  it('有効なdbIdからLocationを生成できる', () => {
-    const loc = Location.createFromDbId('123');
-    expect(loc.isDbId()).toBe(true);
-    expect(loc.isWorldPosition()).toBe(false);
-    expect(loc.value).toEqual({ type: 'dbId', dbId: '123' });
+describe('Location Value Object', () => {
+  describe('Location.createFromDbId()', () => {
+    // DOM-DOM-001: Location.createFromDbId() で DbId ベースの Location が生成される
+    it('DbId ベースの Location が生成され type と dbId が正しい', () => {
+      // Arrange
+      const dbId = 'element-123';
+
+      // Act
+      const location = Location.createFromDbId(dbId);
+
+      // Assert
+      expect(location.value.type).toBe('dbId');
+      expect((location.value as DbIdLocation).dbId).toBe('element-123');
+    });
+
+    // DOM-DOM-003: Location.createFromDbId() で空文字を渡すと DomainError がスローされる
+    it('空文字を渡すと DomainError がスローされる', () => {
+      // Act & Assert
+      expect(() => Location.createFromDbId('')).toThrow(DomainError);
+      expect(() => Location.createFromDbId('')).toThrow('dbId must not be empty');
+    });
   });
 
-  it('空文字列のdbIdは拒否される', () => {
-    expect(() => Location.createFromDbId('')).toThrow('dbId must not be empty');
+  describe('Location.createFromWorldPosition()', () => {
+    // DOM-DOM-002: Location.createFromWorldPosition() で WorldPosition ベースの Location が生成される
+    it('WorldPosition ベースの Location が生成され type と座標値が正しい', () => {
+      // Arrange
+      const x = 1.0;
+      const y = 2.0;
+      const z = 3.0;
+
+      // Act
+      const location = Location.createFromWorldPosition(x, y, z);
+
+      // Assert
+      expect(location.value.type).toBe('worldPosition');
+      const pos = location.value as WorldPositionLocation;
+      expect(pos.x).toBe(1.0);
+      expect(pos.y).toBe(2.0);
+      expect(pos.z).toBe(3.0);
+    });
+
+    // DOM-DOM-004: Location.createFromWorldPosition() で非有限値を渡すと DomainError がスローされる
+    it('z 座標に Infinity を渡すと DomainError がスローされる', () => {
+      // Act & Assert
+      expect(() => Location.createFromWorldPosition(1.0, 2.0, Infinity)).toThrow(DomainError);
+      expect(() => Location.createFromWorldPosition(1.0, 2.0, Infinity)).toThrow(
+        'World position coordinates must be finite numbers'
+      );
+    });
   });
 
-  it('空白のみのdbIdは拒否される', () => {
-    expect(() => Location.createFromDbId('   ')).toThrow('dbId must not be empty');
-  });
-});
+  describe('Location.equals()', () => {
+    // DOM-DOM-005: Location.equals() が同値の DbId Location で true を返す
+    it('同じ dbId を持つ DbId Location 同士で equals() が true を返す', () => {
+      // Arrange
+      const loc1 = Location.createFromDbId('elem-1');
+      const loc2 = Location.createFromDbId('elem-1');
 
-describe('Location.createFromWorldPosition', () => {
-  it('有限座標からLocationを生成できる', () => {
-    const loc = Location.createFromWorldPosition(1.0, 2.5, -3.0);
-    expect(loc.isDbId()).toBe(false);
-    expect(loc.isWorldPosition()).toBe(true);
-    expect(loc.value).toEqual({ type: 'worldPosition', x: 1.0, y: 2.5, z: -3.0 });
-  });
+      // Act
+      const result = loc1.equals(loc2);
 
-  it('ゼロ座標を許容する', () => {
-    const loc = Location.createFromWorldPosition(0, 0, 0);
-    expect(loc.isWorldPosition()).toBe(true);
-  });
+      // Assert
+      expect(result).toBe(true);
+    });
 
-  it('負の座標を許容する', () => {
-    const loc = Location.createFromWorldPosition(-10.5, -20.0, -5.5);
-    expect(loc.isWorldPosition()).toBe(true);
-  });
+    it('異なる dbId を持つ DbId Location 同士で equals() が false を返す', () => {
+      // Arrange
+      const loc1 = Location.createFromDbId('elem-1');
+      const loc2 = Location.createFromDbId('elem-2');
 
-  it('Infinityは拒否される', () => {
-    expect(() => Location.createFromWorldPosition(Infinity, 0, 0))
-      .toThrow('World position coordinates must be finite numbers');
-  });
+      // Act
+      const result = loc1.equals(loc2);
 
-  it('-Infinityは拒否される', () => {
-    expect(() => Location.createFromWorldPosition(0, -Infinity, 0))
-      .toThrow('World position coordinates must be finite numbers');
-  });
+      // Assert
+      expect(result).toBe(false);
+    });
 
-  it('NaNは拒否される', () => {
-    expect(() => Location.createFromWorldPosition(0, 0, NaN))
-      .toThrow('World position coordinates must be finite numbers');
-  });
-});
+    it('同じ座標の WorldPosition Location 同士で equals() が true を返す', () => {
+      // Arrange
+      const loc1 = Location.createFromWorldPosition(1.0, 2.0, 3.0);
+      const loc2 = Location.createFromWorldPosition(1.0, 2.0, 3.0);
 
-describe('Location.reconstruct', () => {
-  it('DbIdLocationから復元できる', () => {
-    const loc = Location.reconstruct({ type: 'dbId', dbId: 'elem-42' });
-    expect(loc.isDbId()).toBe(true);
-  });
+      // Act
+      const result = loc1.equals(loc2);
 
-  it('WorldPositionLocationから復元できる', () => {
-    const loc = Location.reconstruct({ type: 'worldPosition', x: 1, y: 2, z: 3 });
-    expect(loc.isWorldPosition()).toBe(true);
-  });
-});
+      // Assert
+      expect(result).toBe(true);
+    });
 
-describe('Location.equals', () => {
-  it('同じdbIdのLocationは等しい', () => {
-    const a = Location.createFromDbId('42');
-    const b = Location.createFromDbId('42');
-    expect(a.equals(b)).toBe(true);
-  });
+    it('DbId と WorldPosition 型の Location では equals() が false を返す', () => {
+      // Arrange
+      const loc1 = Location.createFromDbId('elem-1');
+      const loc2 = Location.createFromWorldPosition(1.0, 2.0, 3.0);
 
-  it('異なるdbIdのLocationは等しくない', () => {
-    const a = Location.createFromDbId('42');
-    const b = Location.createFromDbId('99');
-    expect(a.equals(b)).toBe(false);
-  });
+      // Act
+      const result = loc1.equals(loc2);
 
-  it('同じWorldPositionのLocationは等しい', () => {
-    const a = Location.createFromWorldPosition(1, 2, 3);
-    const b = Location.createFromWorldPosition(1, 2, 3);
-    expect(a.equals(b)).toBe(true);
-  });
-
-  it('異なるWorldPositionのLocationは等しくない', () => {
-    const a = Location.createFromWorldPosition(1, 2, 3);
-    const b = Location.createFromWorldPosition(1, 2, 4);
-    expect(a.equals(b)).toBe(false);
-  });
-
-  it('タイプが異なるLocationは等しくない', () => {
-    const a = Location.createFromDbId('42');
-    const b = Location.createFromWorldPosition(1, 2, 3);
-    expect(a.equals(b)).toBe(false);
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 });

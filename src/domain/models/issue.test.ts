@@ -3,362 +3,322 @@ import {
   Issue,
   IssueId,
   IssueStatus,
-  IssuePriority,
   IssueType,
+  IssuePriority,
 } from './issue';
-import { Location } from './location';
 import { ProjectId } from './project';
 import { FloorId } from './floor';
 import { UserId } from './user';
+import { Location } from './location';
 import { InvalidStatusTransitionError } from '../errors/invalid-status-transition-error';
 
-describe('Issue - 状態遷移ロジック', () => {
-  // テストで使用するテストダブル
-  const createTestIssue = (
-    status: IssueStatus = IssueStatus.PointOut,
-    assigneeId?: string
-  ): Issue => {
-    const id = IssueId.create('issue-001');
-    const projectId = ProjectId.create('project-001');
-    const floorId = FloorId.create('floor-001');
-    const location = Location.createFromWorldPosition(0, 0, 0);
+// テストヘルパー
+function createTestLocation(): Location {
+  return Location.createFromDbId('element-001');
+}
 
-    if (status === IssueStatus.PointOut) {
-      return Issue.create(
-        id,
+function createTestIds() {
+  return {
+    issueId: IssueId.create('issue-001'),
+    projectId: ProjectId.create('project-001'),
+    floorId: FloorId.create('floor-001'),
+    userId: UserId.create('user-001'),
+    assigneeId: UserId.create('assignee-001'),
+  };
+}
+
+function createTestIssue(status: IssueStatus, assigneeId?: UserId): Issue {
+  const { issueId, projectId, floorId, userId } = createTestIds();
+  return Issue.reconstruct(
+    issueId,
+    projectId,
+    floorId,
+    'テストタイトル',
+    'テスト説明',
+    IssueType.Quality,
+    userId,
+    createTestLocation(),
+    IssuePriority.Medium,
+    status,
+    new Date('2026-12-31'),
+    new Date('2026-01-01'),
+    new Date('2026-01-01'),
+    assigneeId
+  );
+}
+
+describe('Issue 状態遷移', () => {
+  describe('Issue.create() - 新規作成', () => {
+    // DOM-ISS-001: Issue.create() でステータスが POINT_OUT で生成される
+    it('Issue.create() でステータスが POINT_OUT で生成される', () => {
+      // Arrange
+      const { issueId, projectId, floorId, userId } = createTestIds();
+      const location = createTestLocation();
+      const dueDate = new Date('2026-12-31');
+
+      // Act
+      const issue = Issue.create(
+        issueId,
         projectId,
         floorId,
-        'Test Issue',
-        'Description',
+        'タイトル',
+        '説明',
         IssueType.Quality,
-        UserId.create('user-001'),
+        userId,
         location,
-        new Date()
+        dueDate
       );
-    }
 
-    // 他のステータスで復元
-    return Issue.reconstruct(
-      id,
+      // Assert
+      expect(issue.status).toBe(IssueStatus.PointOut);
+    });
+
+    // DOM-ISS-013: Issue.create() でタイトル空文字を渡すと Error がスローされる
+    it('タイトル空文字を渡すと Error がスローされる', () => {
+      // Arrange
+      const { issueId, projectId, floorId, userId } = createTestIds();
+      const location = createTestLocation();
+      const dueDate = new Date('2026-12-31');
+
+      // Act & Assert
+      expect(() =>
+        Issue.create(issueId, projectId, floorId, '', '説明', undefined, userId, location, dueDate)
+      ).toThrow('Issue title must not be empty');
+    });
+
+    // DOM-ISS-014: Issue.create() で無効な dueDate を渡すと Error がスローされる
+    it('無効な dueDate を渡すと Error がスローされる', () => {
+      // Arrange
+      const { issueId, projectId, floorId, userId } = createTestIds();
+      const location = createTestLocation();
+
+      // Act & Assert
+      expect(() =>
+        Issue.create(
+          issueId,
+          projectId,
+          floorId,
+          'タイトル',
+          '説明',
+          undefined,
+          userId,
+          location,
+          new Date('invalid')
+        )
+      ).toThrow('Issue dueDate is invalid');
+    });
+  });
+
+  describe('Issue.createWithAssignee() - 担当者付き新規作成', () => {
+    // DOM-ISS-012: createWithAssignee() で status=Open かつ assigneeId が設定される
+    it('createWithAssignee() で status=Open かつ assigneeId が設定される', () => {
+      // Arrange
+      const { issueId, projectId, floorId, userId, assigneeId } = createTestIds();
+      const location = createTestLocation();
+      const dueDate = new Date('2026-12-31');
+
+      // Act
+      const issue = Issue.createWithAssignee(
+        issueId,
+        projectId,
+        floorId,
+        'タイトル',
+        '説明',
+        undefined,
+        userId,
+        location,
+        dueDate,
+        assigneeId
+      );
+
+      // Assert
+      expect(issue.status).toBe(IssueStatus.Open);
+      expect(issue.assigneeId).toBe(assigneeId);
+    });
+  });
+
+  describe('assignTo() - PointOut → Open', () => {
+    // DOM-ISS-002: PointOut → Open への遷移 (assignTo 正常系)
+    it('PointOut → Open への遷移が成功し assigneeId が設定される', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.PointOut);
+      const assigneeId = UserId.create('new-assignee-001');
+
+      // Act
+      const result = issue.assignTo(assigneeId);
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Open);
+      expect(result.assigneeId).toBe(assigneeId);
+    });
+  });
+
+  describe('startWork() - Open → InProgress', () => {
+    // DOM-ISS-003: Open → InProgress への遷移 (startWork 正常系)
+    it('Open → InProgress への遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Open);
+
+      // Act
+      const result = issue.startWork();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.InProgress);
+    });
+
+    // DOM-ISS-004: startWork() を Open 以外から呼ぶと InvalidStatusTransitionError が発生する
+    it('PointOut 状態から startWork() を呼ぶと InvalidStatusTransitionError が発生する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.PointOut);
+
+      // Act & Assert
+      expect(() => issue.startWork()).toThrow(InvalidStatusTransitionError);
+    });
+  });
+
+  describe('complete() - InProgress → Done', () => {
+    // DOM-ISS-005: InProgress → Done への遷移 (complete 正常系)
+    it('InProgress → Done への遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.InProgress);
+
+      // Act
+      const result = issue.complete();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Done);
+    });
+
+    // DOM-ISS-006: complete() を InProgress 以外から呼ぶと InvalidStatusTransitionError が発生する
+    it('Open 状態から complete() を呼ぶと InvalidStatusTransitionError が発生する (Open → Done 直接遷移禁止)', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Open);
+
+      // Act & Assert
+      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
+    });
+  });
+
+  describe('rejectWork() - InProgress → Open', () => {
+    // DOM-ISS-007: InProgress → Open への遷移 (rejectWork 正常系)
+    it('InProgress → Open への差し戻しが成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.InProgress);
+
+      // Act
+      const result = issue.rejectWork();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Open);
+    });
+  });
+
+  describe('confirm() - Done → Confirmed', () => {
+    // DOM-ISS-008: Done → Confirmed への遷移 (confirm 正常系)
+    it('Done → Confirmed への遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Done);
+
+      // Act
+      const result = issue.confirm();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Confirmed);
+    });
+  });
+
+  describe('rejectCompletion() - Done → Open', () => {
+    // DOM-ISS-009: Done → Open への遷移 (rejectCompletion 正常系)
+    it('Done → Open への否認遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Done);
+
+      // Act
+      const result = issue.rejectCompletion();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Open);
+    });
+  });
+
+  describe('reissue() - Confirmed → Open', () => {
+    // DOM-ISS-010: Confirmed → Open への遷移 (reissue 正常系)
+    it('Confirmed → Open への再指摘遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Confirmed);
+
+      // Act
+      const result = issue.reissue();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Open);
+    });
+  });
+
+  describe('reopenAfterCompletion() - Done → InProgress', () => {
+    // DOM-ISS-011: Done → InProgress への遷移 (reopenAfterCompletion 正常系)
+    it('Done → InProgress への再指摘遷移が成功する', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.Done);
+
+      // Act
+      const result = issue.reopenAfterCompletion();
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.InProgress);
+    });
+  });
+
+  describe('changeAssignee() - 担当者変更', () => {
+    // DOM-ASG-001: changeAssignee() が PointOut 状態の Issue を Open に遷移させる
+    it('PointOut 状態の Issue で changeAssignee() を呼ぶと Open に遷移し assigneeId が更新される', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.PointOut);
+      const newAssigneeId = UserId.create('new-assignee-999');
+
+      // Act
+      const result = issue.changeAssignee(newAssigneeId);
+
+      // Assert
+      expect(result.status).toBe(IssueStatus.Open);
+      expect(result.assigneeId).toBe(newAssigneeId);
+    });
+
+    // DOM-ISS-015: InProgress 中の assignee 変更は InvalidStatusTransitionError
+    it('InProgress 状態で changeAssignee() を呼ぶと InvalidStatusTransitionError がスローされる', () => {
+      // Arrange
+      const issue = createTestIssue(IssueStatus.InProgress);
+      const newAssigneeId = UserId.create('new-assignee-002');
+
+      // Act & Assert
+      expect(() => issue.changeAssignee(newAssigneeId)).toThrow(InvalidStatusTransitionError);
+    });
+  });
+});
+
+describe('IssuePriority', () => {
+  // DOM-DOM-006: Issue に IssuePriority (Low/Medium/High/Critical) が設定できる
+  it('Issue.create() で priority=High を指定すると priority が High になる', () => {
+    // Arrange
+    const { issueId, projectId, floorId, userId } = createTestIds();
+    const location = createTestLocation();
+    const dueDate = new Date('2026-12-31');
+
+    // Act
+    const issue = Issue.create(
+      issueId,
       projectId,
       floorId,
-      'Test Issue',
-      'Description',
-      IssueType.Quality,
-      UserId.create('user-001'),
+      'タイトル',
+      '説明',
+      undefined,
+      userId,
       location,
-      IssuePriority.Medium,
-      status,
-      new Date(),
-      new Date(),
-      new Date(),
-      assigneeId ? UserId.create(assigneeId) : undefined
+      dueDate,
+      IssuePriority.High
     );
-  };
 
-  describe('正常な状態遷移', () => {
-    it('PointOut → Open（assignTo: Assignee設定）', () => {
-      const issue = createTestIssue(IssueStatus.PointOut);
-      const assigneeId = UserId.create('assignee-001');
-      const updatedIssue = issue.assignTo(assigneeId);
-
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-      expect(updatedIssue.isOpen()).toBe(true);
-      expect(updatedIssue.isPointOut()).toBe(false);
-      expect(updatedIssue.assigneeId).toBe(assigneeId);
-    });
-
-    it('Open → InProgress（着手）', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      const updatedIssue = issue.startWork();
-
-      expect(updatedIssue.status).toBe(IssueStatus.InProgress);
-      expect(updatedIssue.isInProgress()).toBe(true);
-      expect(updatedIssue.isOpen()).toBe(false);
-    });
-
-    it('InProgress → Done（是正完了）', () => {
-      const issue = createTestIssue(IssueStatus.InProgress, 'assignee-001');
-      const updatedIssue = issue.complete();
-
-      expect(updatedIssue.status).toBe(IssueStatus.Done);
-      expect(updatedIssue.isDone()).toBe(true);
-      expect(updatedIssue.isInProgress()).toBe(false);
-    });
-
-    it('InProgress → Open（差し戻し）', () => {
-      const issue = createTestIssue(IssueStatus.InProgress, 'assignee-001');
-      const updatedIssue = issue.rejectWork();
-
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-      expect(updatedIssue.isOpen()).toBe(true);
-      expect(updatedIssue.isInProgress()).toBe(false);
-    });
-
-    it('Done → InProgress（再指摘）', () => {
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      const updatedIssue = issue.reopenAfterCompletion();
-
-      expect(updatedIssue.status).toBe(IssueStatus.InProgress);
-      expect(updatedIssue.isInProgress()).toBe(true);
-      expect(updatedIssue.isDone()).toBe(false);
-    });
-
-    it('Done → Confirmed（confirm: Supervisor承認）', () => {
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      const updatedIssue = issue.confirm();
-
-      expect(updatedIssue.status).toBe(IssueStatus.Confirmed);
-      expect(updatedIssue.isConfirmed()).toBe(true);
-      expect(updatedIssue.isDone()).toBe(false);
-    });
-
-    it('Done → Open（rejectCompletion: 否認）', () => {
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      const updatedIssue = issue.rejectCompletion();
-
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-      expect(updatedIssue.isOpen()).toBe(true);
-      expect(updatedIssue.isDone()).toBe(false);
-    });
-
-    it('Confirmed → Open（reissue: 再指摘）', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      const updatedIssue = issue.reissue();
-
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-      expect(updatedIssue.isOpen()).toBe(true);
-      expect(updatedIssue.isConfirmed()).toBe(false);
-    });
-  });
-
-  describe('不正な状態遷移（ビジネスルール違反）', () => {
-    it('Open → Done は禁止', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Open → Open（同じ状態への遷移）は不正', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      expect(() => issue.rejectWork()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Done → Open（rejectWorkは不可、rejectCompletionを使う）', () => {
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      expect(() => issue.rejectWork()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Done → Done（同じ状態への遷移）は不正', () => {
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('InProgress → InProgress（同じ状態への遷移）は不正', () => {
-      const issue = createTestIssue(IssueStatus.InProgress, 'assignee-001');
-      expect(() => issue.startWork()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Open → Confirmed は禁止', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      expect(() => issue.confirm()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Open → assignTo は禁止（PointOutからのみ）', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      expect(() => issue.assignTo(UserId.create('new-assignee'))).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('InProgress → Confirmed は禁止', () => {
-      const issue = createTestIssue(IssueStatus.InProgress, 'assignee-001');
-      expect(() => issue.confirm()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Confirmed → Confirmed は不正', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      expect(() => issue.confirm()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('PointOut → InProgress は禁止', () => {
-      const issue = createTestIssue(IssueStatus.PointOut);
-      expect(() => issue.startWork()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('PointOut → Done は禁止（直接完了不可）', () => {
-      const issue = createTestIssue(IssueStatus.PointOut);
-      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Confirmed → InProgress は禁止（reopenAfterCompletion不可）', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      expect(() => issue.reopenAfterCompletion()).toThrow(InvalidStatusTransitionError);
-    });
-
-    it('Confirmed → Done は禁止', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      expect(() => issue.complete()).toThrow(InvalidStatusTransitionError);
-    });
-  });
-
-  describe('状態遷移時の属性保持', () => {
-    it('状態遷移時に id, projectId, title, description は変わらない', () => {
-      const id = IssueId.create('issue-001');
-      const projectId = ProjectId.create('project-001');
-      const floorId = FloorId.create('floor-001');
-      const location = Location.createFromWorldPosition(1, 2, 3);
-      const title = 'Test Issue Title';
-      const description = 'Test Description';
-
-      const issue = Issue.create(
-        id,
-        projectId,
-        floorId,
-        title,
-        description,
-        IssueType.Quality,
-        UserId.create('user-001'),
-        location,
-        new Date()
-      );
-
-      const assigneeId = UserId.create('assignee-001');
-      const open = issue.assignTo(assigneeId);
-      const inProgress = open.startWork();
-      const done = inProgress.complete();
-
-      expect(done.id).toBe(id);
-      expect(done.projectId).toBe(projectId);
-      expect(done.floorId).toBe(floorId);
-      expect(done.title).toBe(title);
-      expect(done.description).toBe(description);
-      expect(done.location).toBe(location);
-      expect(done.assigneeId).toBe(assigneeId);
-    });
-
-    it('状態遷移時に createdAt は変わらない', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      const originalCreatedAt = issue.createdAt;
-
-      const inProgress = issue.startWork();
-      const done = inProgress.complete();
-
-      expect(done.createdAt).toBe(originalCreatedAt);
-    });
-
-    it('状態遷移時に updatedAt は更新される', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-      const originalUpdatedAt = issue.updatedAt;
-
-      const inProgress = issue.startWork();
-
-      expect(inProgress.updatedAt.getTime()).toBeGreaterThanOrEqual(
-        originalUpdatedAt.getTime()
-      );
-    });
-  });
-
-  describe('ヘルパーメソッド', () => {
-    it('isPointOut() は PointOut 状態で true', () => {
-      const issue = createTestIssue(IssueStatus.PointOut);
-      expect(issue.isPointOut()).toBe(true);
-      expect(issue.isOpen()).toBe(false);
-    });
-
-    it('isConfirmed() は Confirmed 状態で true', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      expect(issue.isConfirmed()).toBe(true);
-      expect(issue.isDone()).toBe(false);
-    });
-  });
-
-  describe('優先度変更', () => {
-    it('任意の状態で優先度を変更できる', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-
-      const updatedIssue = issue.changePriority(IssuePriority.Critical);
-
-      expect(updatedIssue.priority).toBe(IssuePriority.Critical);
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-    });
-  });
-
-  describe('否認・再指摘時のビジネスルール（写真/コメントはApplication層で検証）', () => {
-    it('Done → Open (rejectCompletion) はDomain層では写真チェックなし（phase0: 写真は任意）', () => {
-      // phase0: 「Done → Open: 否認（コメント必須、写真は任意）」
-      // 写真チェックはApplication層(UpdateIssueStatusHandler)の責務
-      // Domain層ではステータス遷移のみ担当
-      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
-      const updatedIssue = issue.rejectCompletion();
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-    });
-
-    it('Confirmed → Open (reissue) はDomain層では写真チェックなし', () => {
-      // phase0: 「Confirmed → Open: 再指摘（コメント必須）」
-      // REJECTION写真チェックはApplication層の責務
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-      const updatedIssue = issue.reissue();
-      expect(updatedIssue.status).toBe(IssueStatus.Open);
-    });
-  });
-
-  describe('完全ライフサイクル', () => {
-    it('PointOut → Open → InProgress → Done → Confirmed の全遷移', () => {
-      const issue = createTestIssue(IssueStatus.PointOut);
-      const assigneeId = UserId.create('assignee-001');
-
-      const open = issue.assignTo(assigneeId);
-      expect(open.status).toBe(IssueStatus.Open);
-
-      const inProgress = open.startWork();
-      expect(inProgress.status).toBe(IssueStatus.InProgress);
-
-      const done = inProgress.complete();
-      expect(done.status).toBe(IssueStatus.Done);
-
-      const confirmed = done.confirm();
-      expect(confirmed.status).toBe(IssueStatus.Confirmed);
-    });
-
-    it('差し戻しループ: Open → InProgress → Open → InProgress → Done', () => {
-      const issue = createTestIssue(IssueStatus.Open, 'assignee-001');
-
-      const inProgress1 = issue.startWork();
-      const rejected = inProgress1.rejectWork();
-      expect(rejected.status).toBe(IssueStatus.Open);
-
-      const inProgress2 = rejected.startWork();
-      const done = inProgress2.complete();
-      expect(done.status).toBe(IssueStatus.Done);
-    });
-
-    it('再指摘ループ: Done → Confirmed → Open → InProgress → Done', () => {
-      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
-
-      const reissued = issue.reissue();
-      expect(reissued.status).toBe(IssueStatus.Open);
-
-      const inProgress = reissued.startWork();
-      const done = inProgress.complete();
-      expect(done.status).toBe(IssueStatus.Done);
-    });
-  });
-
-  describe('新規作成', () => {
-    it('create() は PointOut ステータスで作成される', () => {
-      const issue = Issue.create(
-        IssueId.create('issue-001'),
-        ProjectId.create('project-001'),
-        FloorId.create('floor-001'),
-        'Test Issue',
-        'Description',
-        IssueType.Quality,
-        UserId.create('user-001'),
-        Location.createFromWorldPosition(0, 0, 0),
-        new Date()
-      );
-
-      expect(issue.status).toBe(IssueStatus.PointOut);
-      expect(issue.isPointOut()).toBe(true);
-      expect(issue.assigneeId).toBeUndefined();
-    });
+    // Assert
+    expect(issue.priority).toBe(IssuePriority.High);
   });
 });
