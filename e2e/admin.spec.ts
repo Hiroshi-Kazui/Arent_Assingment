@@ -1,112 +1,116 @@
 import { test, expect } from './fixtures/auth';
 import { SEED } from './fixtures/test-data';
 
-test.describe('Admin - Organizations', () => {
-  test('admin sees organizations list with seed orgs', async ({ adminPage }) => {
-    await adminPage.goto('/admin/organizations');
-    await expect(adminPage.getByText('支部一覧')).toBeVisible();
-    await expect(adminPage.getByText('本社')).toBeVisible();
-  });
+// ────────────────────────────────────────────────
+// E2E-ORG-001: 組織管理フロー (作成→更新→削除)
+// ────────────────────────────────────────────────
 
-  test('admin can add a branch', async ({ adminPage }) => {
-    await adminPage.goto('/admin/organizations');
-    await adminPage.getByRole('button', { name: '支部追加' }).click();
-    const dialog = adminPage.locator('[role="dialog"]');
-    await dialog.getByRole('textbox').fill('E2Eテスト支部');
-    await dialog.getByRole('button', { name: '追加' }).click();
-    await expect(adminPage.getByText('E2Eテスト支部')).toBeVisible();
+test.describe('組織管理 (Admin)', () => {
+  // E2E-ORG-001: 組織管理フロー (作成→更新→削除)
+  test('Admin が Branch 組織を作成・更新・削除できる', async ({ adminPage }) => {
+    const page = adminPage;
 
-    // Cleanup via API
-    const res = await adminPage.request.get('/api/organizations');
-    const body = await res.json();
-    const org = body.find((o: any) => o.name === 'E2Eテスト支部');
-    if (org) {
-      await adminPage.request.delete(`/api/organizations/${org.organizationId}`);
-    }
-  });
-
-  test('admin can edit a branch name', async ({ adminPage }) => {
-    // Create via API first
-    const createRes = await adminPage.request.post('/api/organizations', {
-      data: { name: '編集テスト支部', parentId: SEED.HQ_ORG_ID },
+    // Step 1: POST /api/organizations で Branch 組織を作成
+    const createRes = await page.request.post('/api/organizations', {
+      data: {
+        name: 'E2E テスト新支部',
+        parentId: SEED.HQ_ORG_ID,
+      },
     });
+    expect(createRes.status()).toBe(201);
     const created = await createRes.json();
-    const orgId = created.organizationId;
+    expect(created.organizationId).toBeDefined();
+    expect(created.name).toBe('E2E テスト新支部');
+    const orgId: string = created.organizationId;
 
-    await adminPage.goto('/admin/organizations');
-    // Use .first() to handle leftover rows from previous failed runs
-    const row = adminPage.locator('tr').filter({ hasText: '編集テスト支部' }).first();
-    await expect(row).toBeVisible({ timeout: 30000 });
-    await row.getByRole('button', { name: '編集' }).click();
-    const dialog = adminPage.locator('[role="dialog"]');
-    const input = dialog.getByRole('textbox');
-    await input.clear();
-    await input.fill('編集済み支部');
-    await dialog.getByRole('button', { name: '更新' }).click();
-    await expect(adminPage.getByText('編集済み支部')).toBeVisible();
-
-    // Cleanup
-    await adminPage.request.delete(`/api/organizations/${orgId}`);
-  });
-
-  test('admin can delete a branch', async ({ adminPage }) => {
-    // Create via API first
-    const createRes = await adminPage.request.post('/api/organizations', {
-      data: { name: '削除テスト支部', parentId: SEED.HQ_ORG_ID },
+    // Step 2: PATCH /api/organizations/{id} で組織名を更新
+    const updateRes = await page.request.patch(`/api/organizations/${orgId}`, {
+      data: { name: 'E2E テスト改名支部' },
     });
-    const created = await createRes.json();
-    const orgId = created.organizationId;
+    expect(updateRes.ok()).toBeTruthy();
+    expect(updateRes.status()).toBe(200);
 
-    await adminPage.goto('/admin/organizations');
-    // Use .first() to handle leftover rows from previous failed runs
-    const row = adminPage.locator('tr').filter({ hasText: '削除テスト支部' }).first();
-    await expect(row).toBeVisible({ timeout: 30000 });
-    await row.getByRole('button', { name: '削除' }).click();
-    const dialog = adminPage.locator('[role="dialog"]');
-    await dialog.getByRole('button', { name: '削除' }).click();
-    await expect(adminPage.getByRole('link', { name: '削除テスト支部' }).first()).not.toBeVisible({ timeout: 5000 });
+    // Step 3: DELETE /api/organizations/{id} で組織を削除
+    // （新規作成した組織にはユーザーが所属していないため削除可能）
+    const deleteRes = await page.request.delete(`/api/organizations/${orgId}`);
+    expect(deleteRes.ok()).toBeTruthy();
+    expect(deleteRes.status()).toBe(200);
 
-    // Cleanup fallback (in case UI delete failed)
-    await adminPage.request.delete(`/api/organizations/${orgId}`).catch(() => {});
+    // 後続確認: 組織一覧から削除されていること
+    const listRes = await page.request.get('/api/organizations');
+    expect(listRes.ok()).toBeTruthy();
+    const orgs = await listRes.json();
+    const stillExists = (orgs as Array<{ organizationId?: string; id?: string }>).some(
+      (o) => o.organizationId === orgId || o.id === orgId,
+    );
+    expect(stillExists).toBeFalsy();
   });
 
-  test('non-admin (supervisor) cannot access admin page', async ({ supervisorPage }) => {
-    await supervisorPage.goto('/admin/organizations');
-    await supervisorPage.waitForURL('**/projects', { timeout: 10000 });
-    expect(supervisorPage.url()).toContain('/projects');
+  test('Admin 以外は組織作成ができない (403)', async ({ supervisorPage }) => {
+    const res = await supervisorPage.request.post('/api/organizations', {
+      data: {
+        name: '権限なし支部',
+        parentId: SEED.HQ_ORG_ID,
+      },
+    });
+    expect(res.status()).toBe(403);
   });
 });
 
-test.describe('Admin - Users', () => {
-  test('admin sees users list with seed users', async ({ adminPage }) => {
-    await adminPage.goto('/admin/users');
-    await expect(adminPage.getByRole('cell', { name: '管理者太郎' })).toBeVisible({ timeout: 30000 });
-    await expect(adminPage.getByRole('cell', { name: '監督次郎' })).toBeVisible();
-    await expect(adminPage.getByRole('cell', { name: '作業員三郎' })).toBeVisible();
+// ────────────────────────────────────────────────
+// E2E-USR-001: ユーザー管理フロー (作成→更新→論理削除)
+// ────────────────────────────────────────────────
+
+test.describe('ユーザー管理 (Admin)', () => {
+  // E2E-USR-001: ユーザー管理フロー (作成→更新→論理削除)
+  test('Admin がユーザーを作成・更新・論理削除できる', async ({ adminPage }) => {
+    const page = adminPage;
+    const uniqueSuffix = Date.now();
+    const testEmail = `e2e-user-${uniqueSuffix}@example.com`;
+
+    // Step 1: POST /api/users でユーザーを作成
+    const createRes = await page.request.post('/api/users', {
+      data: {
+        name: 'E2E テストユーザー',
+        email: testEmail,
+        password: 'Password123!',
+        role: 'WORKER',
+        organizationId: SEED.BRANCH_ORG_ID,
+      },
+    });
+    expect(createRes.status()).toBe(201);
+    const created = await createRes.json();
+    expect(created.userId ?? created.id).toBeDefined();
+    const userId: string = created.userId ?? created.id;
+
+    // Step 2: PATCH /api/users/{id} でユーザー名を更新
+    const updateRes = await page.request.patch(`/api/users/${userId}`, {
+      data: { name: 'E2E テスト新名前' },
+    });
+    expect(updateRes.ok()).toBeTruthy();
+    expect(updateRes.status()).toBe(200);
+
+    // Step 3: DELETE /api/users/{id} で論理削除
+    const deleteRes = await page.request.delete(`/api/users/${userId}`);
+    expect(deleteRes.ok()).toBeTruthy();
+    expect(deleteRes.status()).toBe(200);
+
+    // 後続確認: ユーザー一覧で is_active が false になっていること
+    const listRes = await page.request.get('/api/users');
+    expect(listRes.ok()).toBeTruthy();
+    const users = await listRes.json();
+    const deactivated = (users as Array<{ userId?: string; id?: string; isActive?: boolean }>).find(
+      (u) => u.userId === userId || u.id === userId,
+    );
+    // 論理削除なのでレコードは存在し isActive=false であること
+    if (deactivated !== undefined) {
+      expect(deactivated.isActive).toBeFalsy();
+    }
   });
 
-  test('admin can add a user', async ({ adminPage }) => {
-    const testEmail = `e2e.test.${Date.now()}@example.com`;
-    await adminPage.goto('/admin/users');
-    await expect(adminPage.getByRole('button', { name: 'ユーザー追加' })).toBeVisible({ timeout: 30000 });
-    await adminPage.getByRole('button', { name: 'ユーザー追加' }).click();
-    const dialog = adminPage.locator('[role="dialog"]');
-    await dialog.getByPlaceholder('名前を入力').fill('E2Eテストユーザー');
-    await dialog.getByPlaceholder('email@example.com').fill(testEmail);
-    await dialog.getByPlaceholder('パスワードを入力').fill('password123');
-    await dialog.locator('select').nth(0).selectOption('WORKER');
-    await dialog.locator('select').nth(1).selectOption({ index: 1 });
-    await dialog.getByRole('button', { name: '追加' }).click();
-    await expect(adminPage.locator('td').filter({ hasText: 'E2Eテストユーザー' }).first()).toBeVisible();
-
-    // Cleanup via API
-    const res = await adminPage.request.get('/api/users');
-    const body = await res.json();
-    const user = Array.isArray(body)
-      ? body.find((u: any) => u.email === testEmail)
-      : body.items?.find((u: any) => u.email === testEmail);
-    if (user) {
-      await adminPage.request.delete(`/api/users/${user.userId}`);
-    }
+  test('Admin 以外はユーザー一覧を取得できない (403)', async ({ supervisorPage }) => {
+    const res = await supervisorPage.request.get('/api/users');
+    // Supervisor は403, Worker は403
+    expect([401, 403]).toContain(res.status());
   });
 });

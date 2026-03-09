@@ -8,10 +8,14 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   workers: 1,
   reporter: 'line',
+  // Fixed: テストタイムアウトを120秒に延長。マルチステップAPIテストやNext.jsコールドスタートに対応
+  timeout: 120000,
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    actionTimeout: 30000,
+    navigationTimeout: 60000,
   },
   expect: {
     timeout: 10000,

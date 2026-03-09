@@ -1,13 +1,15 @@
 import { test as base, Page, Browser } from '@playwright/test';
 
+// Fixed: goto に timeout と waitUntil を設定し、hydration 完了を待つ
 /** Used only inside issues.spec.ts for multi-role browser contexts */
 export async function loginAs(page: Page, email: string, password: string): Promise<void> {
-  await page.goto('/login');
+  await page.goto('/login', { timeout: 60000, waitUntil: 'networkidle' });
+  await page.waitForLoadState('domcontentloaded');
   await page.getByLabel('メールアドレス').fill(email);
   await page.getByLabel('パスワード').fill(password);
   await page.getByRole('button', { name: 'ログイン' }).click();
   await page.waitForURL((url) => url.pathname.startsWith('/projects') || url.pathname.startsWith('/admin'), {
-    timeout: 30000,
+    timeout: 60000,
   });
 }
 
