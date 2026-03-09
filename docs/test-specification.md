@@ -4,7 +4,7 @@
 |------|------|
 | プロジェクト | Arent 指摘管理ツール |
 | 作成日 | 2026-03-09 |
-| バージョン | 1.0 |
+| バージョン | 1.1（担当者権限ルール反映） |
 
 ---
 
@@ -253,24 +253,58 @@
 
 ### 3.2 UpdateIssueStatusHandler
 
+> **担当者チェックルール（実装 `update-issue-status.ts` L40-46）:**
+> - 原則: `assigneeId !== changedBy` → `Error: 担当者以外はステータスを変更できません`
+> - 例外①: DONE → CONFIRMED / OPEN（承認・否認レビュー）→ 非担当者でもOK
+> - 例外②: CONFIRMED → OPEN（再指摘）→ 非担当者でもOK
+> - API層追加チェック: CONFIRMED は Worker ロール → 403
+
+#### 正常系（担当者による操作）
+
 | ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
 |----|-------------|---------|------|---------|--------|
-| APP-UIS-001 | OPEN→IN_PROGRESS | Issue(OPEN), assignee=user | newStatus=IN_PROGRESS, changedBy=assignee | 成功, status更新 | P0 |
-| APP-UIS-002 | IN_PROGRESS→DONE（After写真あり） | Issue(IN_PROGRESS), After写真1枚以上 | newStatus=DONE | 成功 | P0 |
-| APP-UIS-003 | IN_PROGRESS→DONE（After写真なし） | Issue(IN_PROGRESS), After写真0枚 | newStatus=DONE | Error: After写真必要 | P0 |
-| APP-UIS-004 | IN_PROGRESS→OPEN | Issue(IN_PROGRESS) | newStatus=OPEN | 成功, status=OPEN | P0 |
-| APP-UIS-005 | DONE→CONFIRMED（Supervisor） | Issue(DONE) | newStatus=CONFIRMED, changedBy=Supervisor | 成功 | P0 |
-| APP-UIS-006 | DONE→CONFIRMED（Worker） | Issue(DONE) | newStatus=CONFIRMED, changedBy=Worker | Error: 権限不足 | P0 |
-| APP-UIS-007 | DONE→OPEN（Rejection写真あり+コメント） | Issue(DONE), Rejection写真あり | newStatus=OPEN, comment="理由" | 成功 | P0 |
-| APP-UIS-008 | DONE→OPEN（Rejection写真なし） | Issue(DONE), Rejection写真なし | newStatus=OPEN | Error: Rejection写真必要 | P0 |
-| APP-UIS-009 | DONE→OPEN（コメントなし） | Issue(DONE) | newStatus=OPEN, comment未指定 | Error: コメント必要 | P0 |
-| APP-UIS-010 | CONFIRMED→OPEN（コメント+Rejection写真） | Issue(CONFIRMED), Rejection写真あり | newStatus=OPEN, comment="再指摘" | 成功 | P0 |
-| APP-UIS-011 | CONFIRMED→OPEN（コメントなし） | Issue(CONFIRMED) | newStatus=OPEN | Error: コメント必要 | P0 |
-| APP-UIS-012 | 存在しないIssue | なし | issueId=不正 | 404 Not Found | P1 |
-| APP-UIS-013 | ProjectId不一致 | Issue存在 | projectId≠issue.projectId | Error: 400 | P1 |
-| APP-UIS-014 | 不正なステータス文字列 | なし | newStatus="INVALID" | Error: 400 | P1 |
-| APP-UIS-015 | StatusChangeLog生成確認 | 有効遷移 | 任意の有効遷移 | StatusChangeLog保存 | P1 |
-| APP-UIS-016 | DONE→IN_PROGRESS（再作業） | Issue(DONE) | newStatus=IN_PROGRESS | 成功 | P0 |
+| APP-UIS-001 | OPEN→IN_PROGRESS（担当者） | Issue(OPEN), assignee=workerA | newStatus=IN_PROGRESS, changedBy=workerA | 成功, status=IN_PROGRESS | P0 |
+| APP-UIS-002 | IN_PROGRESS→DONE（担当者, After写真あり） | Issue(IN_PROGRESS), assignee=workerA, After写真1枚以上 | newStatus=DONE, changedBy=workerA | 成功, status=DONE | P0 |
+| APP-UIS-003 | IN_PROGRESS→DONE（After写真なし） | Issue(IN_PROGRESS), assignee=workerA, After写真0枚 | newStatus=DONE, changedBy=workerA | Error: 是正後写真が1枚以上必要 | P0 |
+| APP-UIS-004 | IN_PROGRESS→OPEN（担当者による差し戻し） | Issue(IN_PROGRESS), assignee=workerA | newStatus=OPEN, changedBy=workerA | 成功, status=OPEN | P0 |
+| APP-UIS-005 | DONE→CONFIRMED（Supervisor, 非担当者） | Issue(DONE), assignee=workerA | newStatus=CONFIRMED, changedBy=supervisor | 成功（例外①: 非担当者OK） | P0 |
+| APP-UIS-006 | DONE→CONFIRMED（Worker, API層403） | Issue(DONE) | newStatus=CONFIRMED, changedBy=Worker（API層で拒否） | Error: 403 Workers cannot approve | P0 |
+| APP-UIS-007 | DONE→OPEN（Supervisor否認, Rejection写真+コメント） | Issue(DONE), Rejection写真あり, assignee=workerA | newStatus=OPEN, changedBy=supervisor, comment="理由" | 成功（例外①: 非担当者OK） | P0 |
+| APP-UIS-008 | DONE→OPEN（Rejection写真なし） | Issue(DONE), Rejection写真なし | newStatus=OPEN, comment="理由" | Error: Rejection写真必要 | P0 |
+| APP-UIS-009 | DONE→OPEN（コメントなし） | Issue(DONE), Rejection写真あり | newStatus=OPEN, comment未指定 | Error: 否認にはコメント必須 | P0 |
+| APP-UIS-010 | CONFIRMED→OPEN（Supervisor再指摘, コメント+Rejection写真） | Issue(CONFIRMED), Rejection写真あり, assignee=workerA | newStatus=OPEN, changedBy=supervisor, comment="再指摘" | 成功（例外②: 非担当者OK） | P0 |
+| APP-UIS-011 | CONFIRMED→OPEN（コメントなし） | Issue(CONFIRMED), Rejection写真あり | newStatus=OPEN | Error: 再指摘にはコメント必須 | P0 |
+| APP-UIS-012 | CONFIRMED→OPEN（Rejection写真なし） | Issue(CONFIRMED), Rejection写真なし | newStatus=OPEN, comment="再指摘" | Error: 再指摘には否認時写真必要 | P0 |
+| APP-UIS-013 | DONE→IN_PROGRESS（担当者による再作業） | Issue(DONE), assignee=workerA | newStatus=IN_PROGRESS, changedBy=workerA | 成功, status=IN_PROGRESS | P0 |
+
+#### 担当者チェック異常系（非担当者による操作 → エラー）
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| APP-UIS-020 | OPEN→IN_PROGRESS（非担当者Supervisor） | Issue(OPEN), assignee=workerA | newStatus=IN_PROGRESS, changedBy=supervisor | Error: 担当者以外はステータスを変更できません | P0 |
+| APP-UIS-021 | OPEN→IN_PROGRESS（非担当者Admin） | Issue(OPEN), assignee=workerA | newStatus=IN_PROGRESS, changedBy=admin | Error: 担当者以外はステータスを変更できません | P0 |
+| APP-UIS-022 | IN_PROGRESS→DONE（非担当者Supervisor） | Issue(IN_PROGRESS), assignee=workerA, After写真あり | newStatus=DONE, changedBy=supervisor | Error: 担当者以外はステータスを変更できません | P0 |
+| APP-UIS-023 | IN_PROGRESS→DONE（非担当者Admin） | Issue(IN_PROGRESS), assignee=workerA, After写真あり | newStatus=DONE, changedBy=admin | Error: 担当者以外はステータスを変更できません | P0 |
+| APP-UIS-024 | IN_PROGRESS→OPEN（非担当者Supervisor） | Issue(IN_PROGRESS), assignee=workerA | newStatus=OPEN, changedBy=supervisor | Error: 担当者以外はステータスを変更できません | P0 |
+| APP-UIS-025 | DONE→IN_PROGRESS（非担当者Supervisor） | Issue(DONE), assignee=workerA | newStatus=IN_PROGRESS, changedBy=supervisor | Error: 担当者以外はステータスを変更できません | P0 |
+
+#### 担当者チェック例外パターン確認（非担当者でもOK）
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| APP-UIS-030 | DONE→CONFIRMED（非担当者Supervisor）OK | Issue(DONE), assignee=workerA | newStatus=CONFIRMED, changedBy=supervisor | 成功（isDoneReview例外） | P0 |
+| APP-UIS-031 | DONE→OPEN（非担当者Supervisor否認）OK | Issue(DONE), assignee=workerA, Rejection写真+コメント | newStatus=OPEN, changedBy=supervisor, comment="否認" | 成功（isDoneReview例外） | P0 |
+| APP-UIS-032 | CONFIRMED→OPEN（非担当者Supervisor再指摘）OK | Issue(CONFIRMED), assignee=workerA, Rejection写真+コメント | newStatus=OPEN, changedBy=supervisor, comment="再指摘" | 成功（isReissue例外） | P0 |
+
+#### 共通バリデーション
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| APP-UIS-040 | 存在しないIssue | なし | issueId=不正 | Error: Issue not found | P1 |
+| APP-UIS-041 | ProjectId不一致 | Issue存在 | projectId≠issue.projectId | Error: Issue does not belong to project | P1 |
+| APP-UIS-042 | 不正なステータス文字列 | なし | newStatus="INVALID" | Error: Invalid status | P1 |
+| APP-UIS-043 | StatusChangeLog生成確認 | 有効遷移 | 任意の有効遷移 | StatusChangeLog保存（from/to/changedBy/comment記録） | P1 |
+| APP-UIS-044 | assignee未設定Issueの遷移 | Issue(OPEN), assignee=undefined | newStatus=IN_PROGRESS, changedBy=anyUser | 成功（assigneeId=nullのためチェックスキップ） | P1 |
 
 ---
 
@@ -548,18 +582,59 @@
 
 ### 5.11 PATCH /api/projects/{id}/issues/{issueId}/status
 
+> **権限チェック（2段階）:**
+> 1. API Route層: CONFIRMED は Worker ロール → 403
+> 2. Application Handler層: 担当者以外 → Error（例外: DONE承認/否認, CONFIRMED再指摘）
+
+#### 担当者正常操作
+
 | ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
 |----|-------------|---------|------|---------|--------|
-| API-STA-001 | OPEN→IN_PROGRESS | Issue(OPEN), assignee認証 | { status: "IN_PROGRESS" } | 200 | P0 |
-| API-STA-002 | IN_PROGRESS→DONE（After写真あり） | Issue(IN_PROGRESS), After写真 | { status: "DONE" } | 200 | P0 |
-| API-STA-003 | IN_PROGRESS→DONE（After写真なし） | Issue(IN_PROGRESS), After写真0 | { status: "DONE" } | 400 | P0 |
-| API-STA-004 | DONE→CONFIRMED（Supervisor） | Issue(DONE), Supervisor認証 | { status: "CONFIRMED" } | 200 | P0 |
-| API-STA-005 | DONE→CONFIRMED（Worker） | Issue(DONE), Worker認証 | { status: "CONFIRMED" } | 403 | P0 |
-| API-STA-006 | OPEN→DONE禁止 | Issue(OPEN) | { status: "DONE" } | 400 | P0 |
-| API-STA-007 | DONE→OPEN（コメント+Rejection写真） | Issue(DONE), Rejection写真 | { status: "OPEN", comment: "理由" } | 200 | P0 |
-| API-STA-008 | DONE→OPEN（コメントなし） | Issue(DONE) | { status: "OPEN" } | 400 | P0 |
-| API-STA-009 | 不正ステータス文字列 | Issue存在 | { status: "INVALID" } | 400 | P1 |
-| API-STA-010 | 存在しないIssue | なし | PATCH /invalid | 404 | P1 |
+| API-STA-001 | OPEN→IN_PROGRESS（担当者Worker認証） | Issue(OPEN), assignee=workerA, workerA認証 | { status: "IN_PROGRESS" } | 200 | P0 |
+| API-STA-002 | IN_PROGRESS→DONE（担当者, After写真あり） | Issue(IN_PROGRESS), assignee=workerA, workerA認証, After写真あり | { status: "DONE" } | 200 | P0 |
+| API-STA-003 | IN_PROGRESS→DONE（After写真なし） | Issue(IN_PROGRESS), assignee=workerA, workerA認証, After写真0 | { status: "DONE" } | 400 是正後写真必要 | P0 |
+| API-STA-004 | IN_PROGRESS→OPEN（担当者差し戻し） | Issue(IN_PROGRESS), assignee=workerA, workerA認証 | { status: "OPEN" } | 200 | P0 |
+| API-STA-005 | DONE→IN_PROGRESS（担当者再作業） | Issue(DONE), assignee=workerA, workerA認証 | { status: "IN_PROGRESS" } | 200 | P0 |
+
+#### Supervisor/Admin承認・否認・再指摘（非担当者でもOK）
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| API-STA-010 | DONE→CONFIRMED（Supervisor承認, 非担当者） | Issue(DONE), assignee=workerA, Supervisor認証 | { status: "CONFIRMED" } | 200 | P0 |
+| API-STA-011 | DONE→CONFIRMED（Admin承認, 非担当者） | Issue(DONE), assignee=workerA, Admin認証 | { status: "CONFIRMED" } | 200 | P0 |
+| API-STA-012 | DONE→OPEN（Supervisor否認, Rejection写真+コメント） | Issue(DONE), assignee=workerA, Supervisor認証, Rejection写真あり | { status: "OPEN", comment: "理由" } | 200 | P0 |
+| API-STA-013 | CONFIRMED→OPEN（Supervisor再指摘, Rejection写真+コメント） | Issue(CONFIRMED), Supervisor認証, Rejection写真あり | { status: "OPEN", comment: "再指摘" } | 200 | P0 |
+
+#### 権限エラー（API層403: Worker→CONFIRMED）
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| API-STA-020 | DONE→CONFIRMED（Worker） | Issue(DONE), Worker認証 | { status: "CONFIRMED" } | 403 Workers cannot approve | P0 |
+
+#### 担当者チェックエラー（Handler層: 非担当者 → 遷移拒否）
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| API-STA-030 | OPEN→IN_PROGRESS（Supervisor, 非担当者） | Issue(OPEN), assignee=workerA, Supervisor認証 | { status: "IN_PROGRESS" } | 400 担当者以外はステータスを変更できません | P0 |
+| API-STA-031 | OPEN→IN_PROGRESS（Admin, 非担当者） | Issue(OPEN), assignee=workerA, Admin認証 | { status: "IN_PROGRESS" } | 400 担当者以外は～ | P0 |
+| API-STA-032 | IN_PROGRESS→DONE（Supervisor, 非担当者） | Issue(IN_PROGRESS), assignee=workerA, Supervisor認証, After写真あり | { status: "DONE" } | 400 担当者以外は～ | P0 |
+| API-STA-033 | IN_PROGRESS→OPEN（Admin, 非担当者） | Issue(IN_PROGRESS), assignee=workerA, Admin認証 | { status: "OPEN" } | 400 担当者以外は～ | P0 |
+| API-STA-034 | DONE→IN_PROGRESS（Supervisor, 非担当者） | Issue(DONE), assignee=workerA, Supervisor認証 | { status: "IN_PROGRESS" } | 400 担当者以外は～ | P0 |
+| API-STA-035 | IN_PROGRESS→DONE（別Worker, 非担当者） | Issue(IN_PROGRESS), assignee=workerA, workerB認証, After写真あり | { status: "DONE" } | 400 担当者以外は～ | P0 |
+
+#### ビジネスルール・バリデーション
+
+| ID | テストケース | 前提条件 | 入力 | 期待結果 | 優先度 |
+|----|-------------|---------|------|---------|--------|
+| API-STA-040 | OPEN→DONE直接遷移禁止 | Issue(OPEN), assignee認証 | { status: "DONE" } | 400 InvalidStatusTransition | P0 |
+| API-STA-041 | DONE→OPEN（コメントなし） | Issue(DONE), Supervisor認証 | { status: "OPEN" } | 400 コメント必須 | P0 |
+| API-STA-042 | DONE→OPEN（Rejection写真なし） | Issue(DONE), Supervisor認証, Rejection写真0 | { status: "OPEN", comment: "理由" } | 400（写真チェックは実装依存） | P1 |
+| API-STA-043 | CONFIRMED→OPEN（コメントなし） | Issue(CONFIRMED), Supervisor認証 | { status: "OPEN" } | 400 コメント必須 | P0 |
+| API-STA-044 | CONFIRMED→OPEN（Rejection写真なし） | Issue(CONFIRMED), Supervisor認証, Rejection写真0 | { status: "OPEN", comment: "再指摘" } | 400 否認時写真必要 | P0 |
+| API-STA-045 | 不正ステータス文字列 | Issue存在 | { status: "INVALID" } | 400 Invalid status | P1 |
+| API-STA-046 | status未指定 | Issue存在 | {} | 400 Missing required field | P1 |
+| API-STA-047 | 存在しないIssue | なし | PATCH /invalid | 404 | P1 |
+| API-STA-048 | ステータス文字列正規化（大小文字） | Issue(OPEN), assignee認証 | { status: "InProgress" } | 200（PascalCaseも受付） | P2 |
 
 ---
 
@@ -812,6 +887,19 @@ Issue Status 全遷移パターンの網羅表。
 - **OK** = 状態変化なし（プロパティ変更のみ）
 - **→ X** = 状態遷移成功
 
+### 操作者制約マトリクス（状態遷移×誰が実行できるか）
+
+| 遷移 | 担当者(Worker) | 非担当者Supervisor | 非担当者Admin | 根拠 |
+|------|------------|-----------------|-------------|------|
+| OPEN → IN_PROGRESS | **担当者のみ** | NG | NG | Handler L44: assigneeId !== changedBy |
+| IN_PROGRESS → DONE | **担当者のみ** | NG | NG | Handler L44: assigneeId !== changedBy |
+| IN_PROGRESS → OPEN | **担当者のみ** | NG | NG | Handler L44: assigneeId !== changedBy |
+| DONE → IN_PROGRESS | **担当者のみ** | NG | NG | Handler L44: assigneeId !== changedBy |
+| DONE → CONFIRMED | NG (API 403) | **OK** | **OK** | isDoneReview例外 + API層Workerブロック |
+| DONE → OPEN | NG (API層は通過するがHandler判定は要確認) | **OK** | **OK** | isDoneReview例外 |
+| CONFIRMED → OPEN | 要確認 | **OK** | **OK** | isReissue例外 |
+| POINT_OUT → OPEN | N/A | **OK** | **OK** | assignTo (割当操作) |
+
 ---
 
 ## 付録B: 写真要件マトリクス
@@ -827,21 +915,26 @@ Issue Status 全遷移パターンの網羅表。
 
 ## 付録C: 権限マトリクス
 
-| 操作 | Admin | Supervisor | Worker |
-|------|-------|------------|--------|
-| プロジェクト作成 | OK | NG | NG |
-| プロジェクト更新 | OK | NG | NG |
-| プロジェクト一覧 | 全件 | 支店内 | 担当Issue関連のみ |
-| Issue作成 | OK | OK | NG |
-| Issue一覧 | 全件 | 全件 | 担当のみ |
-| ステータス変更（一般） | OK | OK | 担当分のみ |
-| ステータス→CONFIRMED | OK | OK | NG |
-| 担当者割当/変更 | OK | OK | NG |
-| 写真アップロード | OK | OK | OK |
-| 写真削除（自分の） | OK | OK | OK |
-| 写真削除（他人の） | OK | OK | NG |
-| ユーザー作成 | OK | NG | NG |
-| 組織作成/更新/削除 | OK | NG | NG |
+| 操作 | Admin | Supervisor | Worker | 備考 |
+|------|-------|------------|--------|------|
+| プロジェクト作成 | OK | NG | NG | requireRole(Admin) |
+| プロジェクト更新 | OK | NG | NG | requireRole(Admin) |
+| プロジェクト一覧 | 全件 | 支店内 | 担当Issue関連のみ | Query層でフィルタ |
+| Issue作成 | OK | OK | NG | requireRole(Admin,Supervisor) |
+| Issue一覧 | 全件 | 全件 | 担当のみ | Query層でassignee_idフィルタ |
+| **着手 OPEN→IN_PROGRESS** | **担当者のみ** | **担当者のみ** | **担当者のみ** | **Handler: assigneeId===changedBy** |
+| **是正完了 IN_PROGRESS→DONE** | **担当者のみ** | **担当者のみ** | **担当者のみ** | **Handler: assigneeId===changedBy** |
+| **差し戻し IN_PROGRESS→OPEN** | **担当者のみ** | **担当者のみ** | **担当者のみ** | **Handler: assigneeId===changedBy** |
+| **再作業 DONE→IN_PROGRESS** | **担当者のみ** | **担当者のみ** | **担当者のみ** | **Handler: assigneeId===changedBy** |
+| 承認 DONE→CONFIRMED | OK（非担当者OK） | OK（非担当者OK） | **NG (API 403)** | isDoneReview例外 + API層 |
+| 否認 DONE→OPEN | OK（非担当者OK） | OK（非担当者OK） | 要確認 | isDoneReview例外 |
+| 再指摘 CONFIRMED→OPEN | OK（非担当者OK） | OK（非担当者OK） | 要確認 | isReissue例外 |
+| 担当者割当/変更 | OK | OK | NG | requireRole(Admin,Supervisor) |
+| 写真アップロード | OK | OK | OK | requireSession |
+| 写真削除（自分の） | OK | OK | OK | uploadedBy===userId |
+| 写真削除（他人の） | OK | OK | **NG (403)** | PhotoDeleteForbiddenError |
+| ユーザー作成 | OK | NG | NG | requireRole(Admin) |
+| 組織作成/更新/削除 | OK | NG | NG | requireRole(Admin) |
 
 ---
 
@@ -850,9 +943,17 @@ Issue Status 全遷移パターンの網羅表。
 | カテゴリ | P0 | P1 | P2 | P3 | 合計 |
 |---------|----|----|----|----|------|
 | ドメイン層 | 20 | 24 | 30 | 5 | 79 |
-| アプリケーション層（Command） | 11 | 22 | 14 | 0 | 47 |
+| アプリケーション層（Command）※担当者チェック含む | 24 | 18 | 14 | 0 | 56 |
 | アプリケーション層（Query） | 3 | 10 | 14 | 1 | 28 |
-| API統合テスト | 16 | 22 | 18 | 2 | 58 |
+| API統合テスト ※担当者チェック+API403含む | 26 | 16 | 13 | 1 | 56 |
 | インフラ層 | 0 | 12 | 15 | 1 | 28 |
 | E2Eシナリオ | 5 | 7 | 5 | 1 | 18 |
-| **合計** | **55** | **97** | **96** | **10** | **258** |
+| **合計** | **78** | **87** | **91** | **9** | **265** |
+
+> **v1.0→v1.1 変更点:**
+> - UpdateIssueStatusHandler: 「担当者のみ」ルールの負のテストケース6件追加 (APP-UIS-020〜025)
+> - UpdateIssueStatusHandler: 「非担当者OK例外」確認テスト3件追加 (APP-UIS-030〜032)
+> - API Status: 担当者チェック異常系6件追加 (API-STA-030〜035)
+> - API Status: 正常系・例外パターンをアクター（誰が操作するか）明示に全面書換
+> - 権限マトリクス: 「ステータス変更（一般）」→遷移ごとに分解し担当者制約を明記
+> - 操作者制約マトリクス（付録A-2）を新設
