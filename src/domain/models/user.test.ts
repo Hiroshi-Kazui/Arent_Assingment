@@ -56,6 +56,31 @@ describe('User.reconstruct', () => {
   });
 });
 
+describe('User - ビジネスルール（phase0 §0.3）', () => {
+  it('B4: メールアドレスの形式バリデーション（一意性はDB層で保証）', () => {
+    // phase0: 「メールアドレス（ログイン用、一意）」
+    // Domain層では形式チェック、DB層(Prisma @unique)で一意性を保証
+    expect(() =>
+      User.create(userId, orgId, '名前', 'invalid', UserRole.Worker)
+    ).toThrow('User email must be valid');
+
+    expect(() =>
+      User.create(userId, orgId, '名前', '', UserRole.Worker)
+    ).toThrow('User email must be valid');
+  });
+
+  it('B5: ユーザー無効化はisActive=falseで表現（論理削除）', () => {
+    // api-design: 「物理削除ではなくisActive: falseに更新」
+    // DeactivateUserHandlerがprisma.user.updateでis_active: falseを設定
+    const now = new Date();
+    const activeUser = User.reconstruct(userId, orgId, '名前', 'a@b.com', UserRole.Worker, true, now, now);
+    expect(activeUser.isActive).toBe(true);
+
+    const deactivatedUser = User.reconstruct(userId, orgId, '名前', 'a@b.com', UserRole.Worker, false, now, now);
+    expect(deactivatedUser.isActive).toBe(false);
+  });
+});
+
 describe('ロール判定メソッド', () => {
   it('AdminユーザーはisAdmin()がtrue', () => {
     const user = User.create(userId, orgId, '管理者', 'admin@example.com', UserRole.Admin);
