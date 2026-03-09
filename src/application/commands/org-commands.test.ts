@@ -100,7 +100,24 @@ describe('DeleteOrganizationHandler - 統合テスト', () => {
 });
 
 describe('CreateOrganizationHandler - 統合テスト', () => {
-  // APP-ORG-003: CreateOrganizationHandler は BRANCH 型の組織のみ作成できる
+  // APP-ORG-005: HQ type を指定して CreateOrganizationHandler を呼ぶとバリデーションエラー
+  it('parentId が undefined の場合バリデーションエラーがスローされる（HQ 型組織の作成禁止）', async () => {
+    // Arrange
+    const repo = createMockOrgRepository();
+    const handler = new CreateOrganizationHandler(repo);
+
+    // Act & Assert
+    // CreateOrganizationInput の parentId は必須。undefined を渡すと OrganizationId.create() でエラーになる
+    // HQ 組織は parentId なしで作成されるが、ハンドラは常に Branch 型のみ作成でき
+    // かつ parentId の検証でエラーになるため、HQ 型の組織は作成不可
+    await expect(
+      handler.execute({ name: '本社2', parentId: undefined as unknown as string })
+    ).rejects.toThrow();
+    // repo.save が呼ばれていないことを確認（HQ 組織が作成されていない）
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  // APP-ORG-004: CreateOrganizationHandler は BRANCH 型の組織のみ作成できる
   it('BRANCH 型の組織のみが作成され repo.save() に渡される', async () => {
     // Arrange
     const repo = createMockOrgRepository();

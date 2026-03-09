@@ -76,6 +76,64 @@ describe('POST /api/projects/{id}/issues/{issueId}/photos', () => {
     expect(body.error).toContain('Invalid file extension');
   });
 
+  // API-AUT-013: Admin ロールで写真アップロード成功
+  it('Admin ロールで有効な jpg ファイル + photoPhase=AFTER を送ると HTTP 201 が返る', async () => {
+    // Arrange
+    mockAuthSuccess('ADMIN');
+    (getCommandHandlers as ReturnType<typeof vi.fn>).mockReturnValue({
+      addPhoto: {
+        execute: vi.fn().mockResolvedValue('photo-new-002'),
+      },
+    });
+    const formData = new FormData();
+    const jpgFile = new File(['fake image data'], 'photo.jpg', {
+      type: 'image/jpeg',
+    });
+    formData.append('file', jpgFile);
+    formData.append('photoPhase', 'AFTER');
+
+    const request = createMultipartRequest(
+      'http://localhost/api/projects/p1/issues/i1/photos',
+      formData
+    );
+    const params = Promise.resolve({ id: 'p1', issueId: 'i1' });
+
+    // Act
+    const response = await POST(request, { params });
+
+    // Assert
+    expect(response.status).toBe(201);
+  });
+
+  // API-AUT-014: Supervisor ロールで写真アップロード成功
+  it('Supervisor ロールで有効な jpg ファイル + photoPhase=BEFORE を送ると HTTP 201 が返る', async () => {
+    // Arrange
+    mockAuthSuccess('SUPERVISOR');
+    (getCommandHandlers as ReturnType<typeof vi.fn>).mockReturnValue({
+      addPhoto: {
+        execute: vi.fn().mockResolvedValue('photo-new-003'),
+      },
+    });
+    const formData = new FormData();
+    const jpgFile = new File(['fake image data'], 'photo.jpg', {
+      type: 'image/jpeg',
+    });
+    formData.append('file', jpgFile);
+    formData.append('photoPhase', 'BEFORE');
+
+    const request = createMultipartRequest(
+      'http://localhost/api/projects/p1/issues/i1/photos',
+      formData
+    );
+    const params = Promise.resolve({ id: 'p1', issueId: 'i1' });
+
+    // Act
+    const response = await POST(request, { params });
+
+    // Assert
+    expect(response.status).toBe(201);
+  });
+
   // API-AUT-007: WORKER ロールで写真アップロードが成功する
   it('Worker ロールで有効な jpg ファイルを送ると HTTP 201 が返る', async () => {
     // Arrange

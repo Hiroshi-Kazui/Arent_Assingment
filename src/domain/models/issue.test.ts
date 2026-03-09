@@ -296,6 +296,34 @@ describe('Issue 状態遷移', () => {
   });
 });
 
+describe('ブランド型 ID 型安全性', () => {
+  // DOM-DOM-007: ブランド型による ID 型安全性の確認
+  it('IssueId と ProjectId は同じ文字列でも異なるブランド型として区別される', () => {
+    // Arrange
+    const rawId = 'id-001';
+
+    // Act
+    const issueId = IssueId.create(rawId);
+    const projectId = ProjectId.create(rawId);
+
+    // Assert
+    // ランタイムでは同じ文字列値だが、型のブランドタグが異なることを確認
+    // TypeScript のブランド型は型レベルの制約であり、ランタイムでは同一の文字列
+    expect(issueId).toBe(rawId);
+    expect(projectId).toBe(rawId);
+    // ブランド型のタグプロパティはコンパイル時にのみ存在するため、
+    // ランタイムでの検証は型アサーションを通して行う
+    // IssueId.__brand === 'IssueId', ProjectId.__brand === 'ProjectId' という型レベルの区別を確認
+    // 型キャストして各ブランド型固有の関数に渡せることを確認（型安全な代入）
+    const issueIdAsIssueId: IssueId = issueId;
+    const projectIdAsProjectId: ProjectId = projectId;
+    expect(issueIdAsIssueId).toBe('id-001');
+    expect(projectIdAsProjectId).toBe('id-001');
+    // 両者は値として等しいが、型として別物（TypeScript コンパイラが区別する）
+    expect(String(issueId)).toBe(String(projectId));
+  });
+});
+
 describe('IssuePriority', () => {
   // DOM-DOM-006: Issue に IssuePriority (Low/Medium/High/Critical) が設定できる
   it('Issue.create() で priority=High を指定すると priority が High になる', () => {

@@ -89,6 +89,35 @@ describe('DELETE /api/projects/{id}/issues/{issueId}', () => {
 });
 
 describe('PATCH /api/projects/{id}/issues/{issueId}', () => {
+  // API-AUT-015: Supervisor ロールでタイトル更新成功
+  it('Supervisor ロールでタイトル更新が成功し HTTP 200 が返る', async () => {
+    // Arrange
+    mockRoleSuccess('SUPERVISOR');
+    (getCommandHandlers as ReturnType<typeof vi.fn>).mockReturnValue({
+      updateIssueTitle: {
+        execute: vi.fn().mockResolvedValue(undefined),
+      },
+      updateIssueDescription: {
+        execute: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    const request = new Request(
+      'http://localhost/api/projects/p1/issues/i1',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '新タイトル' }),
+      }
+    );
+    const params = Promise.resolve({ id: 'p1', issueId: 'i1' });
+
+    // Act
+    const response = await PATCH(request, { params });
+
+    // Assert
+    expect(response.status).toBe(200);
+  });
+
   // API-AUT-010: Admin/Supervisor でタイトル更新が成功する
   it('Admin ロールでタイトル更新が成功し HTTP 200 が返る', async () => {
     // Arrange

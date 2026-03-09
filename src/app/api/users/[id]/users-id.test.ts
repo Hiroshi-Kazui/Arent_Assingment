@@ -15,7 +15,7 @@ vi.mock('@/application/di', () => ({
 
 import { getServerSession } from 'next-auth';
 import { getCommandHandlers } from '@/application/di';
-import { DELETE } from './route';
+import { DELETE, PATCH } from './route';
 
 function mockSession(role: string) {
   (getServerSession as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -61,6 +61,50 @@ describe('DELETE /api/users/{id}', () => {
 
     // Act
     const response = await DELETE(request, { params });
+
+    // Assert
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/users/{id}', () => {
+  // API-API-022: PATCH /api/users/{id} - Admin でユーザー更新成功
+  it('Admin ロールでユーザー更新が成功し HTTP 200 と { message: "User updated" } が返る', async () => {
+    // Arrange
+    mockSession('ADMIN');
+    (getCommandHandlers as ReturnType<typeof vi.fn>).mockReturnValue({
+      updateUser: {
+        execute: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    const request = new Request('http://localhost/api/users/user-001', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '更新後', role: 'SUPERVISOR' }),
+    });
+    const params = Promise.resolve({ id: 'user-001' });
+
+    // Act
+    const response = await PATCH(request, { params });
+
+    // Assert
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ message: 'User updated' });
+  });
+
+  it('Supervisor ロールでは 403 が返る', async () => {
+    // Arrange
+    mockSession('SUPERVISOR');
+    const request = new Request('http://localhost/api/users/user-001', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '更新後', role: 'SUPERVISOR' }),
+    });
+    const params = Promise.resolve({ id: 'user-001' });
+
+    // Act
+    const response = await PATCH(request, { params });
 
     // Assert
     expect(response.status).toBe(403);
