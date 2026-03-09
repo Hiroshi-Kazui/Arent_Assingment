@@ -269,6 +269,12 @@ npm run dev
 | doc-writer | ドキュメント（`README.md`、`docs/`） | sonnet | README・アーキテクチャ図・ER 図・API 設計書の作成・維持。ソースコードを読んで実装の実態を反映する。 |
 | reviewer | 全レイヤー（読み取り専用） | sonnet | 仕様と実装のギャップ分析・コードレビュー・権限ルール監査。ファイルの変更は一切行わない。 |
 | project-manager | 統合・調整 | opus | `/team-dispatch` や `/impl-plan` スキルが出力した PM プロンプトを受け取り、TeamCreate でエージェントチームを組成・実行するオーケストレーター。 |
+| test-spec-analyzer | テスト仕様（読み取り専用） | sonnet | 設計仕様（phase0_plan.md, api-design.md）と実装コードをクロスリファレンスし、Truth Matrix（仕様 vs 実装の一致/不一致表）を生成する。 |
+| test-spec-writer | テスト仕様（`docs/test-spec.md`） | sonnet | Truth Matrix に基づいて構造化されたテスト仕様書を生成する。テストケースを DOM-/APP-/API-/E2E- のカテゴリで自動採番。 |
+| test-spec-reviewer | テスト仕様（読み取り専用） | sonnet | 生成されたテスト仕様書を Truth Matrix と照合し、カバレッジ・品質・トレーサビリティを検証する。 |
+| unit-test-coder | テストコード（`src/**/*.test.ts`） | sonnet | テスト仕様書から Vitest のユニット/統合テストコードを生成する。DOM-/APP-/API- テストケースを担当。 |
+| e2e-test-coder | テストコード（`e2e/*.spec.ts`） | sonnet | テスト仕様書から Playwright の E2E テストコードを生成する。E2E- テストケースを担当。ロール別認証フィクスチャを活用。 |
+| test-fixer | テストコード修正 | sonnet | テストの実装バグ（モック不備、非同期タイミング、セレクタ誤り等）を診断・修正する。テストの期待値・検証内容は変更しない。最大3回の fix→execute→verify ループを実行。 |
 
 ### スキル（スラッシュコマンド）一覧
 
@@ -280,6 +286,11 @@ npm run dev
 | `/plan-phase N` | `doc/phase0_plan.md` の対象フェーズを読み、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
 | `/impl-plan [scope]` | 仕様と現在の実装を比較してギャップを分析し、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
 | `/team-dispatch [plan-file]` | 作業プランをエージェント別に分割し、Wave ごとの並行実行プランファイルと project-manager へのプロンプトを出力 |
+| `/gen-test-spec [scope]` | 設計仕様と実装コードから Truth Matrix を生成し、テスト仕様書（`docs/test-spec.md`）を自動生成・検証する |
+| `/gen-test-code [scope]` | テスト仕様書から Unit/Integration テスト（Vitest）と E2E テスト（Playwright）のコードを生成する。**生成のみ、実行は行わない** |
+| `/run-test [scope]` | テストを実行し結果をレポートする。**読み取り専用、コードの修正は一切行わない。** 失敗原因の推定（テスト側/プロダクション側/環境）を提示 |
+| `/fix-test [scope] [N]` | テストコードの実装バグ（モック不備、非同期タイミング等）のみを修正する。**テストの期待値・検証内容は変更しない。** 修正→再テストを最大N回（デフォルト3回）ループ |
+| `/fix-prod [scope] [N]` | テスト失敗の原因がプロダクションコード側にある場合に該当コードを修正する。レイヤーに応じた専門エージェントを自動選定。修正→再テストを最大N回（デフォルト3回）ループ |
 
 ### 開発フロー
 
@@ -304,6 +315,24 @@ npm run dev
 2. Agent(project-manager)  → TeamCreate でエージェントチームを組成・実行
 3. /commit-push            → 成果をコミット＆プッシュ
 ```
+
+#### パターン C: テスト駆動（仕様→テスト→修正）
+
+設計仕様からテスト仕様書とテストコードを自動生成し、テスト結果をもとにプロダクションコードを修正する。
+
+```
+1. /gen-test-spec [scope]   → 設計仕様×実装コードのクロスリファレンスでテスト仕様書を生成
+2. /gen-test-code [scope]   → テスト仕様書からテストコードを生成（Unit/Integration + E2E）
+3. /run-test [scope]        → テスト実行、結果レポート（読み取り専用）
+4. 人間が判断               → 失敗の原因がテスト側かプロダクション側かを判定
+5a. /fix-test [scope]       → テストコードの実装バグのみ修正（期待値は変更しない）
+5b. /fix-prod [scope]       → プロダクションコードを修正（レイヤー別エージェント自動選定）
+6. /commit-push             → 成果をコミット＆プッシュ
+```
+
+**設計原則**: テストは仕様の具現化であり、テストの期待値・検証内容は変更しない。テストが失敗した場合、原則としてプロダクションコード側を修正する。テストコードの修正は実装バグ（モック不備、非同期タイミング等）に限定される。
+
+仕様変更が必要な場合は `/gen-test-spec` → `/gen-test-code` を再実行してテスト仕様書とテストコードを再生成する。
 
 #### 重い計画書は /team-dispatch で分割
 

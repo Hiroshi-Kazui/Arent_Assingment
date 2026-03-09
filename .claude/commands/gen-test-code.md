@@ -5,7 +5,7 @@
 ## このスキルの目的
 
 テスト仕様書（`docs/test-spec.md`）に基づいて、Unit/Integration テストコード（Vitest）と
-E2E テストコード（Playwright）を自動生成し、テスト実行まで行う。
+E2E テストコード（Playwright）を自動生成する。**生成のみ。実行・修正は行わない。**
 
 **前提条件**: `docs/test-spec.md` が存在すること（`/gen-test-spec` で事前生成）
 
@@ -44,12 +44,10 @@ E2E テストケースが0件の場合は Step 3 をスキップ。
 docs/test-spec.md
 
 ## 既存テストファイル（重複防止のため確認すること）
-- src/domain/models/issue.test.ts
-- src/domain/models/location.test.ts
-- src/domain/models/organization.test.ts
-- src/domain/models/user.test.ts
-- src/application/commands/issue-commands.test.ts
-- src/application/commands/business-rules.test.ts
+- src/domain/models/*.test.ts
+- src/application/commands/*.test.ts
+- src/application/queries/*.test.ts
+- src/app/api/**/*.test.ts
 
 エージェント定義のパターンに従い、テストコードを生成してください。
 ```
@@ -72,10 +70,7 @@ docs/test-spec.md
 docs/test-spec.md
 
 ## 既存E2Eテストファイル（重複防止のため確認すること）
-- e2e/auth.spec.ts
-- e2e/issues.spec.ts
-- e2e/projects.spec.ts
-- e2e/admin.spec.ts
+- e2e/*.spec.ts
 
 ## フィクスチャ・ヘルパー
 - e2e/fixtures/auth.ts（ロール別認証フィクスチャ）
@@ -86,29 +81,7 @@ docs/test-spec.md
 
 ---
 
-### Step 4: テスト実行 + エラー修正
-
-`test-fixer` エージェント（subagent_type）を起動する。
-
-**プロンプト:**
-```
-以下のテストファイルを実行し、失敗があれば修正してください。
-
-## Unit/Integration テスト
-{Step 2 で生成/変更されたファイルパス一覧}
-実行コマンド: npx vitest run {ファイルパス}
-
-## E2E テスト
-{Step 3 で生成/変更されたファイルパス一覧}
-実行コマンド: npx playwright test {ファイルパス}
-
-最大3回のfix→execute→verifyループを実行してください。
-エージェント定義の診断フローに従い、修正レポートを返却してください。
-```
-
----
-
-### Step 5: 結果レポート
+### Step 4: 結果レポート
 
 以下をチャットに出力する:
 
@@ -123,21 +96,10 @@ docs/test-spec.md
 ### 生成ファイル
 | ファイル | 操作 | テストケース数 |
 |---------|------|-------------|
-| src/domain/models/issue.test.ts | 追記 | +X件 |
-| e2e/issues.spec.ts | 追記 | +Y件 |
-| e2e/permissions.spec.ts | 新規 | Z件 |
-
-### テスト実行結果
-- Unit/Integration: XX passed / YY total
-- E2E: XX passed / YY total
-- 修正ループ: N回
-
-### 未解決の失敗（あれば）
-{test-fixerの未解決レポート}
+| (生成されたファイル一覧) |
 
 ### 次のアクション
-- 全テスト合格: テストコード実装完了
-- 未解決あり: 手動修正が必要（プロダクションコードの変更等）
+`/run-test` でテストを実行してください。
 ```
 
 ---
@@ -158,7 +120,6 @@ docs/test-spec.md
 ## 注意事項
 
 - Step 2 と Step 3 は並行実行可能（依存関係なし）
-- Step 4 は Step 2 + Step 3 の完了後に実行する
-- E2E テストの実行には Docker（PostgreSQL + MinIO）と dev server が起動している必要がある
 - テスト仕様書が存在しない場合は `/gen-test-spec` を先に実行するよう案内すること
 - 既存テストとの重複を避けるため、既存ファイルの Read は必須
+- **テストの実行・修正は行わない。** `/run-test` に委譲する
