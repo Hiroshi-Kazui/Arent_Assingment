@@ -4,19 +4,29 @@
 
 ## このスキルの目的
 
-テスト仕様書（`docs/test-spec.md`）に基づいて、Unit/Integration テストコード（Vitest）と
-E2E テストコード（Playwright）を自動生成する。**生成のみ。実行・修正は行わない。**
+テスト仕様書に基づいて、Unit/Integration テストコードと E2E テストコードを自動生成する。
+**生成のみ。実行・修正は行わない。**
 
-**前提条件**: `docs/test-spec.md` が存在すること（`/gen-test-spec` で事前生成）
+**プロジェクト固有設定**: `.claude/project-config.md` を参照すること。
 
 ---
 
 ## 実行手順
 
+### Step 0: プロジェクト設定の読み取り
+
+`.claude/project-config.md` を読み取り、以下を把握する:
+- テスト仕様書のパス
+- テストツールチェイン（Unit/Integration, E2E）
+- 既存テストファイルパターン（重複防止用）
+- E2E フィクスチャ・ヘルパー
+- スコープ別テストファイル対応表
+
+---
+
 ### Step 1: 未実装テストケースの抽出
 
-`docs/test-spec.md`（または `docs/test-specs/{scope}.md`）を読み取り、
-「実装状態: 未実装」のテストケースを抽出する。
+テスト仕様書を読み取り、「実装状態: 未実装」のテストケースを抽出する。
 
 $ARGUMENTS が指定されている場合はそのスコープのテストケースのみ対象とする。
 
@@ -35,19 +45,16 @@ E2E テストケースが0件の場合は Step 3 をスキップ。
 
 **プロンプト:**
 ```
-以下の未実装テストケースに対して Vitest テストコードを生成してください。
+以下の未実装テストケースに対してテストコードを生成してください。
+
+## プロジェクト設定
+`.claude/project-config.md` を読み取り、テストツールチェイン・既存テストファイルパターンを確認してください。
 
 ## 対象テストケース
 {Step 1 で抽出した DOM-* / APP-* / API-* テストケース一覧}
 
 ## テスト仕様書パス
-docs/test-spec.md
-
-## 既存テストファイル（重複防止のため確認すること）
-- src/domain/models/*.test.ts
-- src/application/commands/*.test.ts
-- src/application/queries/*.test.ts
-- src/app/api/**/*.test.ts
+`.claude/project-config.md` の「テスト仕様書」パスを参照
 
 エージェント定義のパターンに従い、テストコードを生成してください。
 ```
@@ -61,20 +68,16 @@ docs/test-spec.md
 
 **プロンプト:**
 ```
-以下の未実装テストケースに対して Playwright テストコードを生成してください。
+以下の未実装テストケースに対して E2E テストコードを生成してください。
+
+## プロジェクト設定
+`.claude/project-config.md` を読み取り、テストツールチェイン・E2Eフィクスチャ・ヘルパーを確認してください。
 
 ## 対象テストケース
 {Step 1 で抽出した E2E-* テストケース一覧}
 
 ## テスト仕様書パス
-docs/test-spec.md
-
-## 既存E2Eテストファイル（重複防止のため確認すること）
-- e2e/*.spec.ts
-
-## フィクスチャ・ヘルパー
-- e2e/fixtures/auth.ts（ロール別認証フィクスチャ）
-- e2e/fixtures/test-data.ts（SEED定数）
+`.claude/project-config.md` の「テスト仕様書」パスを参照
 
 エージェント定義のパターンに従い、テストコードを生成してください。
 ```
@@ -103,19 +106,6 @@ docs/test-spec.md
 ```
 
 ---
-
-## スコープ別テストファイル対応表
-
-| スコープ | Unit/Integration | E2E |
-|---------|-----------------|-----|
-| `issue` | issue.test.ts, issue-commands.test.ts | issues.spec.ts |
-| `organization` | organization.test.ts, org-commands.test.ts | admin.spec.ts |
-| `user` | user.test.ts, user-commands.test.ts | admin.spec.ts |
-| `auth` | - | auth.spec.ts, permissions.spec.ts |
-| `api` | `src/app/api/**/*.test.ts` | - |
-| `e2e` | - | `e2e/*.spec.ts`（全ファイル） |
-| `domain` | `src/domain/models/*.test.ts` | - |
-| `全体` | 全Unit/Integration | 全E2E |
 
 ## 注意事項
 

@@ -7,36 +7,41 @@
 テストを実行し、結果をレポートする。**読み取り専用。コードの修正は一切行わない。**
 失敗の原因がテストコード側かプロダクションコード側かを人間が判断するための情報を提供する。
 
+**プロジェクト固有設定**: `.claude/project-config.md` を参照すること。
+
 ---
 
 ## 実行手順
 
+### Step 0: プロジェクト設定の読み取り
+
+`.claude/project-config.md` を読み取り、以下を把握する:
+- テストツールチェイン（実行コマンド）
+- テストファイルパターン
+- E2E 前提条件
+- スコープ別テストファイル対応表
+
+---
+
 ### Step 1: テスト対象ファイルの特定
 
 $ARGUMENTS が指定されている場合:
-- スコープに対応するテストファイルのみ対象とする（下記対応表参照）
+- スコープ別テストファイル対応表に従い、対象ファイルのみテストする
 
 $ARGUMENTS が未指定の場合:
 - 全テストファイルを対象とする
 
 **分類:**
-- **Unit/Integration**: `src/**/*.test.ts` → Step 2 へ
-- **E2E**: `e2e/*.spec.ts` → Step 3 へ
+- **Unit/Integration**: テストファイルパターンに合致 → Step 2 へ
+- **E2E**: E2E テストファイルパターンに合致 → Step 3 へ
 
 ---
 
 ### Step 2: Unit/Integration テスト実行
 
-以下のコマンドを実行する:
+project-config.md に記載された Unit/Integration 実行コマンドを使用する。
 
-```bash
-npx vitest run {対象ファイルパス} --reporter=verbose 2>&1
-```
-
-$ARGUMENTS が未指定の場合:
-```bash
-npx vitest run --reporter=verbose 2>&1
-```
+$ARGUMENTS が指定されている場合は対象ファイルパスを追加する。
 
 **結果を記録する（修正は行わない）。**
 
@@ -44,21 +49,13 @@ npx vitest run --reporter=verbose 2>&1
 
 ### Step 3: E2E テスト実行
 
-以下のコマンドを実行する:
+project-config.md に記載された E2E 実行コマンドを使用する。
 
-```bash
-npx playwright test {対象ファイルパス} --reporter=list 2>&1
-```
-
-$ARGUMENTS が未指定の場合:
-```bash
-npx playwright test --reporter=list 2>&1
-```
+$ARGUMENTS が指定されている場合は対象ファイルパスを追加する。
 
 **結果を記録する（修正は行わない）。**
 
-**注意**: E2E テストの実行には Docker（PostgreSQL + MinIO）と dev server が起動している必要がある。
-起動していない場合はその旨をレポートに記載し、スキップする。
+**注意**: E2E 前提条件（project-config.md に記載）が満たされていない場合はその旨をレポートに記載し、スキップする。
 
 ---
 
@@ -93,22 +90,8 @@ npx playwright test --reporter=list 2>&1
 
 ---
 
-## スコープ別テストファイル対応表
-
-| スコープ | Unit/Integration | E2E |
-|---------|-----------------|-----|
-| `issue` | issue.test.ts, issue-commands.test.ts | issues.spec.ts |
-| `organization` | organization.test.ts, org-commands.test.ts | admin.spec.ts |
-| `user` | user.test.ts, user-commands.test.ts | admin.spec.ts |
-| `auth` | - | auth.spec.ts, permissions.spec.ts |
-| `api` | `src/app/api/**/*.test.ts` | - |
-| `e2e` | - | `e2e/*.spec.ts`（全ファイル） |
-| `domain` | `src/domain/models/*.test.ts` | - |
-| `unit` | `src/**/*.test.ts`（全ファイル） | - |
-| `全体` | 全Unit/Integration | 全E2E |
-
 ## 注意事項
 
 - **コードの修正は一切行わない。** 結果レポートのみ出力する
 - 推定原因の分類は参考情報であり、最終判断は人間が行う
-- E2E テスト実行前に Docker と dev server の起動状態を確認すること
+- E2E テスト実行前に前提条件の起動状態を確認すること

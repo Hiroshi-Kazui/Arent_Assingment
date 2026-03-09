@@ -2,9 +2,18 @@
 
 未コミットの変更を論理的なグループに分割し、適切なコミットメッセージを付けてコミット＆プッシュする。
 
+**プロジェクト固有設定**: `.claude/project-config.md` を参照すること。
+
 ## 実行手順
 
 以下のステップを順番に実行してください。
+
+---
+
+### Step 0: プロジェクト設定の読み取り
+
+`.claude/project-config.md` を読み取り、以下を把握する:
+- レイヤー構造（パス → commit prefix 対応表）
 
 ---
 
@@ -18,17 +27,7 @@
 
 ### Step 2: 変更をグループに分類する
 
-以下の観点でファイルをグループ化する:
-
-| グループ | 対象パス | prefixの例 |
-|---------|---------|-----------|
-| Domain層 | `src/domain/` | `feat(domain):` / `fix(domain):` |
-| Application層 | `src/application/` | `feat(application):` / `fix(application):` |
-| Infrastructure層 | `src/infrastructure/`, `prisma/` | `feat(infra):` / `fix(infra):` |
-| API / UI | `src/app/` | `feat(api):` / `feat(ui):` / `fix(api):` |
-| ドキュメント | `doc/`, `README.md` | `docs:` |
-| 設定 | `.env.example`, `docker-compose.yml`, `*.config.*` | `chore:` |
-| テスト | `**/*.test.*`, `**/*.spec.*` | `test:` |
+`project-config.md` の「レイヤー構造」テーブルを参照し、ファイルをグループ化する。
 
 - 同一機能に関連する複数層の変更は1コミットにまとめてよい
 - 無関係な変更は必ず別コミットにする
@@ -40,6 +39,7 @@
 各グループのコミットメッセージは以下のルールに従う:
 
 - **Conventional Commits** 形式: `type(scope): 説明`
+- commit prefix は `project-config.md` の「レイヤー構造」テーブルに従う
 - 説明は「何をしたか」ではなく「なぜ・何のためか」を書く
 - `git log` の言語（日本語/英語）に合わせる
 - 必ず末尾に付与: `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
