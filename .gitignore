@@ -6,3 +6,6 @@ dev.log
 .claude/settings.local.json
 .claude/agents/.claude/
 doc/PM業務体験_課題資料.pdf
+e2e/.auth/
+/test-results/
+/playwright-report/
