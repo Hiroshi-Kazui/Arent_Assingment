@@ -30,8 +30,7 @@ export default function LoginForm() {
       if (result?.error) {
         setError('メールアドレスまたはパスワードが正しくありません');
       } else {
-        router.push(callbackUrl);
-        router.refresh();
+        window.location.href = callbackUrl;
       }
     } catch {
       setError('ログインに失敗しました');
