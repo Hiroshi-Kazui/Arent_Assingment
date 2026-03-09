@@ -57,6 +57,25 @@ describe('Organization.create', () => {
   });
 });
 
+describe('Organization - ビジネスルール（phase0 §0.3, §0.13）', () => {
+  it('B1: Domain層ではHeadquarters作成を許容（制約はApplication層で強制）', () => {
+    // phase0: 「アプリから作成できる組織はBranch（支部）のみ。Headquarters typeは作成不可」
+    // CreateOrganizationHandlerがOrganizationType.Branchをハードコードして強制
+    // Domain層はシーダ用にHeadquarters作成が必要なため許容
+    const id = OrganizationId.create('hq-test');
+    const org = Organization.create(id, 'テスト本社', OrganizationType.Headquarters);
+    expect(org.type).toBe(OrganizationType.Headquarters);
+  });
+
+  it('B1: Branch typeの組織は正常に作成できる', () => {
+    const id = OrganizationId.create('branch-test');
+    const hqId = OrganizationId.create('hq-1');
+    const org = Organization.create(id, '大阪支店', OrganizationType.Branch, hqId);
+    expect(org.type).toBe(OrganizationType.Branch);
+    expect(org.parentId).toBe(hqId);
+  });
+});
+
 describe('Organization.reconstruct', () => {
   it('全フィールドを指定して復元できる', () => {
     const id = OrganizationId.create('org-1');

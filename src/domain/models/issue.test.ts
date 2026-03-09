@@ -281,6 +281,25 @@ describe('Issue - 状態遷移ロジック', () => {
     });
   });
 
+  describe('否認・再指摘時のビジネスルール（写真/コメントはApplication層で検証）', () => {
+    it('Done → Open (rejectCompletion) はDomain層では写真チェックなし（phase0: 写真は任意）', () => {
+      // phase0: 「Done → Open: 否認（コメント必須、写真は任意）」
+      // 写真チェックはApplication層(UpdateIssueStatusHandler)の責務
+      // Domain層ではステータス遷移のみ担当
+      const issue = createTestIssue(IssueStatus.Done, 'assignee-001');
+      const updatedIssue = issue.rejectCompletion();
+      expect(updatedIssue.status).toBe(IssueStatus.Open);
+    });
+
+    it('Confirmed → Open (reissue) はDomain層では写真チェックなし', () => {
+      // phase0: 「Confirmed → Open: 再指摘（コメント必須）」
+      // REJECTION写真チェックはApplication層の責務
+      const issue = createTestIssue(IssueStatus.Confirmed, 'assignee-001');
+      const updatedIssue = issue.reissue();
+      expect(updatedIssue.status).toBe(IssueStatus.Open);
+    });
+  });
+
   describe('完全ライフサイクル', () => {
     it('PointOut → Open → InProgress → Done → Confirmed の全遷移', () => {
       const issue = createTestIssue(IssueStatus.PointOut);
