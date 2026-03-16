@@ -1,28 +1,43 @@
 erDiagram
-    organization {
-        string organization_id PK
+    Organization ||--o{ Organization : "parent (HQ->Branch)"
+    Organization ||--o{ User : "belongs to"
+    Organization ||--o{ Building : "manages"
+    Organization ||--o{ Project : "manages"
+    Building ||--o{ Floor : "has"
+    Building ||--o{ Project : "target"
+    Building ||--o{ ElementFloorMapping : "contains"
+    Floor ||--o{ Issue : "located on"
+    Floor ||--o{ ElementFloorMapping : "mapped to"
+    Project ||--o{ Issue : "contains"
+    Issue ||--o{ Photo : "attached"
+    Issue ||--o{ StatusChangeLog : "history"
+    User ||--o{ Issue : "reported by"
+    User ||--o{ Issue : "assigned to"
+    User ||--o{ StatusChangeLog : "changed by"
+
+    Organization {
+        uuid organization_id PK
         string name
-        string type "HEADQUARTERS | BRANCH"
-        string parent_id FK "nullable, self-ref"
+        string type "Headquarters / Branch"
+        uuid parent_id FK "nullable - HQ is null"
         datetime created_at
         datetime updated_at
     }
 
-    user {
-        string user_id PK
-        string organization_id FK
+    User {
+        uuid user_id PK
+        uuid organization_id FK
         string name
         string email "unique"
-        string password_hash
-        string role "ADMIN | SUPERVISOR | WORKER"
+        string role "Admin / Supervisor / Worker"
         boolean is_active
         datetime created_at
         datetime updated_at
     }
 
-    building {
-        string building_id PK
-        string branch_id FK "nullable, Organization"
+    Building {
+        uuid building_id PK
+        uuid branch_id FK "Organization (Branch)"
         string name
         string address
         decimal latitude
@@ -32,89 +47,72 @@ erDiagram
         datetime updated_at
     }
 
-    floor {
-        string floor_id PK
-        string building_id FK
-        string name "1F, B1F, RF etc."
-        int floor_number "for sort"
-        decimal elevation "nullable, Z height"
+    Floor {
+        uuid floor_id PK
+        uuid building_id FK
+        string name "e.g. 1F, B1F, RF"
+        int floor_number "sort order"
+        decimal elevation "nullable - mm, estimated from BoundingBox Z"
         datetime created_at
         datetime updated_at
     }
 
-    project {
-        string project_id PK
-        string building_id FK
-        string branch_id FK "nullable, Organization"
+    Project {
+        uuid project_id PK
+        uuid branch_id FK "Organization (Branch)"
+        uuid building_id FK
         string name
-        string plan "free text"
-        datetime start_date
-        datetime due_date
-        string status "PLANNING | ACTIVE | COMPLETED"
+        text plan "project plan (free text)"
+        date start_date
+        date due_date
+        string status "Planning / Active / Completed"
         datetime created_at
         datetime updated_at
     }
 
-    issue {
-        string issue_id PK
-        string project_id FK
-        string floor_id FK
-        string reported_by FK "User"
-        string assignee_id FK "nullable, User"
+    Issue {
+        uuid issue_id PK
+        uuid project_id FK
+        uuid floor_id FK
         string title
-        string description
-        string issue_type "nullable: QUALITY | SAFETY | CONSTRUCTION | DESIGN"
-        string status "POINT_OUT | OPEN | IN_PROGRESS | DONE | CONFIRMED"
-        string priority "LOW | MEDIUM | HIGH | CRITICAL"
-        datetime due_date
-        string location_type "dbId | worldPosition"
-        int db_id "nullable"
+        text description
+        string issue_type "Quality / Safety / Construction / Design"
+        string status "PointOut / Open / InProgress / Done / Confirmed"
+        string location_type "DbId / WorldPosition"
+        int db_id "nullable - Viewer element ID"
         decimal world_position_x "nullable"
         decimal world_position_y "nullable"
         decimal world_position_z "nullable"
+        uuid reported_by FK "User"
+        uuid assignee_id FK "nullable - User"
+        date due_date "nullable"
         datetime created_at
         datetime updated_at
     }
 
-    photo {
-        string photo_id PK
-        string issue_id FK
-        string blob_key "storage key path"
-        string photo_phase "BEFORE | AFTER | REJECTION"
+    Photo {
+        uuid photo_id PK
+        uuid issue_id FK
+        string blob_key "storage path"
+        string photo_phase "Before / After / Rejection"
         datetime uploaded_at
     }
 
-    status_change_log {
-        string log_id PK
-        string issue_id FK
-        string changed_by FK "User"
+    StatusChangeLog {
+        uuid log_id PK
+        uuid issue_id FK
         string from_status
         string to_status
-        string comment "nullable"
+        uuid changed_by FK "User"
+        text comment "nullable - required on rejection"
         datetime changed_at
     }
 
-    element_floor_mapping {
-        string building_id PK_FK
-        int db_id PK "Viewer element ID"
-        string floor_id FK
-        decimal bounding_box_min_z "nullable"
+    ElementFloorMapping {
+        uuid building_id PK "composite PK"
+        int db_id PK "composite PK - Viewer element ID"
+        uuid floor_id FK
+        decimal bounding_box_min_z "for debug"
         datetime created_at
         datetime updated_at
     }
-
-    organization ||--o{ organization : "parent_id (HQ -> Branch)"
-    organization ||--o{ user : "organization_id"
-    organization ||--o{ building : "branch_id"
-    organization ||--o{ project : "branch_id"
-    building ||--o{ floor : "building_id"
-    building ||--o{ project : "building_id"
-    building ||--o{ element_floor_mapping : "building_id"
-    floor ||--o{ issue : "floor_id"
-    floor ||--o{ element_floor_mapping : "floor_id"
-    project ||--o{ issue : "project_id"
-    user ||--o{ issue : "reported_by"
-    user ||--o{ issue : "assignee_id"
-    user ||--o{ status_change_log : "changed_by"
-    issue ||--o{ photo : "issue_id"
-    issue ||--o{ status_change_log : "issue_id"
