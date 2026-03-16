@@ -3,6 +3,7 @@ import { UpdateIssueStatusHandler } from './update-issue-status';
 import { AddPhotoHandler } from './add-photo';
 import { IIssueRepository } from '../../domain/repositories/issue-repository';
 import { IPhotoRepository } from '../../domain/repositories/photo-repository';
+import { IProjectRepository } from '../../domain/repositories/project-repository';
 import { IStatusChangeLogRepository } from '../../domain/repositories/status-change-log-repository';
 import { PhotoStorage } from '../../domain/repositories/photo-storage';
 import {
@@ -14,7 +15,9 @@ import {
 } from '../../domain/models/issue';
 import { Photo, PhotoId, PhotoPhase } from '../../domain/models/photo';
 import { StatusChangeLog } from '../../domain/models/status-change-log';
-import { ProjectId } from '../../domain/models/project';
+import { Project, ProjectId, ProjectStatus } from '../../domain/models/project';
+import { BuildingId } from '../../domain/models/building';
+import { OrganizationId } from '../../domain/models/organization';
 import { FloorId } from '../../domain/models/floor';
 import { UserId } from '../../domain/models/user';
 import { Location } from '../../domain/models/location';
@@ -91,6 +94,27 @@ function createMockStatusChangeLogRepository(): IStatusChangeLogRepository {
   };
 }
 
+function createMockProjectRepository(project: Project | null = null): IProjectRepository {
+  return {
+    findById: vi.fn().mockResolvedValue(project),
+    findAll: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createTestProject(status: ProjectStatus = ProjectStatus.Planning): Project {
+  return Project.reconstruct(
+    ProjectId.create('project-001'),
+    BuildingId.create('building-001'),
+    'テストプロジェクト',
+    new Date('2026-01-01'),
+    new Date('2026-12-31'),
+    status,
+    OrganizationId.create('org-001'),
+    ''
+  );
+}
+
 function createMockPhotoStorage(): PhotoStorage {
   return {
     upload: vi.fn().mockResolvedValue(undefined),
@@ -108,7 +132,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]); // After 写真なし
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -128,7 +152,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([createAfterPhoto()]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act
       await handler.execute({
@@ -152,7 +176,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act
       await handler.execute({
@@ -174,7 +198,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -196,7 +220,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([createAfterPhoto()]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -217,7 +241,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([createRejectionPhoto()]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -238,7 +262,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]); // Rejection 写真なし
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -259,7 +283,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([createRejectionPhoto()]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act
       await handler.execute({
@@ -281,7 +305,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act & Assert
       await expect(
@@ -303,7 +327,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       const issueRepo = createMockIssueRepository(issue);
       const photoRepo = createMockPhotoRepository([]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act
       await handler.execute({
@@ -336,7 +360,7 @@ describe('UpdateIssueStatusHandler - 統合テスト', () => {
       };
       const photoRepo = createMockPhotoRepository([]);
       const logRepo = createMockStatusChangeLogRepository();
-      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo);
+      const handler = new UpdateIssueStatusHandler(issueRepo, photoRepo, logRepo, createMockProjectRepository());
 
       // Act
       await handler.execute({

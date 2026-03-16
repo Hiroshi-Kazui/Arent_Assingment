@@ -12,5 +12,7 @@ export default defineConfig({
     environment: 'node',
     // Fixed: e2eディレクトリのPlaywrightテストをvitestが拾わないよう除外
     exclude: ['node_modules', 'e2e/**'],
+    pool: 'forks',
+    fileParallelism: false,
   },
 });
