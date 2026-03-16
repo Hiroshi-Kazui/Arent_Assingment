@@ -6,10 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+function isSafeRedirect(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//');
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/projects';
+  const rawCallbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = isSafeRedirect(rawCallbackUrl) ? rawCallbackUrl : '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
