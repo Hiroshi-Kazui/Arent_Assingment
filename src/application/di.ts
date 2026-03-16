@@ -91,7 +91,7 @@ export function getCommandHandlers() {
 
   return {
     createIssue: new CreateIssueHandler(repos.issue),
-    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue, repos.photo, repos.statusChangeLog),
+    updateIssueStatus: new UpdateIssueStatusHandler(repos.issue, repos.photo, repos.statusChangeLog, repos.project),
     addPhoto: new AddPhotoHandler(
       repos.issue,
       storages.photoStorage,

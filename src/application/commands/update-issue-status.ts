@@ -1,9 +1,10 @@
 import { IIssueRepository } from '../../domain/repositories/issue-repository';
 import { IPhotoRepository } from '../../domain/repositories/photo-repository';
+import { IProjectRepository } from '../../domain/repositories/project-repository';
 import { IStatusChangeLogRepository } from '../../domain/repositories/status-change-log-repository';
 import { IssueId } from '../../domain/models/issue';
 import { PhotoPhase } from '../../domain/models/photo';
-import { ProjectId } from '../../domain/models/project';
+import { ProjectId, ProjectStatus } from '../../domain/models/project';
 import { UserId } from '../../domain/models/user';
 import { StatusChangeLog, StatusChangeLogId } from '../../domain/models/status-change-log';
 import { UpdateIssueStatusInput } from '../dto/issue-dto';
@@ -18,7 +19,8 @@ export class UpdateIssueStatusHandler {
   constructor(
     private issueRepository: IIssueRepository,
     private photoRepository: IPhotoRepository,
-    private statusChangeLogRepository: IStatusChangeLogRepository
+    private statusChangeLogRepository: IStatusChangeLogRepository,
+    private projectRepository: IProjectRepository
   ) {}
 
   async execute(input: UpdateIssueStatusInput): Promise<void> {
@@ -99,6 +101,15 @@ export class UpdateIssueStatusHandler {
     }
 
     await this.issueRepository.save(updatedIssue);
+
+    // 指摘が着手されたら、計画中プロジェクトを自動的に進行中へ
+    if (updatedIssue.isInProgress()) {
+      const project = await this.projectRepository.findById(projectId);
+      if (project && project.status === ProjectStatus.Planning) {
+        const activatedProject = project.changeStatus(ProjectStatus.Active);
+        await this.projectRepository.save(activatedProject);
+      }
+    }
 
     // StatusChangeLog 記録
     const log = StatusChangeLog.create(
