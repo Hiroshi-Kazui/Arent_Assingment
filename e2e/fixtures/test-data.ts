@@ -6,10 +6,10 @@ export const SEED = {
   FLOOR_1F_ID: 'e6d73e7e-cb1a-4b6d-bac6-4319943e0e3e',
   ADMIN_USER_ID: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   SUPERVISOR_USER_ID: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-  WORKER_USER_ID: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+  WORKER_USER_ID: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01',
   ADMIN_EMAIL: 'admin@example.com',
   SUPERVISOR_EMAIL: 'sup@example.com',
-  WORKER_EMAIL: 'worker@example.com',
+  WORKER_EMAIL: 'worker1@example.com',
   PASSWORD: 'password123',
   PROJECT_NAME: 'Aビル新築工事',
 } as const;

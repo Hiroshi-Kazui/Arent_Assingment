@@ -29,7 +29,9 @@ npm run dev
 |--------|--------------|-----------|---------|
 | ADMIN | `admin@example.com` | `password123` | 組織・ユーザー管理（`/admin`） |
 | SUPERVISOR | `sup@example.com` | `password123` | 指摘作成・担当割当・ステータス変更・承認 |
-| WORKER | `worker@example.com` | `password123` | 写真アップロード・ステータス変更（担当案件のみ） |
+| WORKER | `worker1@example.com` | `password123` | 写真アップロード・ステータス変更（担当案件のみ） |
+| WORKER | `worker2@example.com` | `password123` | 同上 |
+| WORKER | `worker3@example.com` | `password123` | 同上 |
 
 ## 4. 全体アーキテクチャ（§8.1）
 - 参照図: `doc/architecture.mmd`

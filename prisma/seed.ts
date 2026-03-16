@@ -93,7 +93,9 @@ async function main() {
 
   const ADMIN_USER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
   const SUPERVISOR_USER_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
-  const WORKER_USER_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+  const WORKER_USER_ID_1 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01';
+  const WORKER_USER_ID_2 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02';
+  const WORKER_USER_ID_3 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeee03';
 
   await prisma.user.upsert({
     where: { user_id: ADMIN_USER_ID },
@@ -124,18 +126,52 @@ async function main() {
   console.log('✓ User created: sup@example.com (SUPERVISOR)');
 
   await prisma.user.upsert({
-    where: { user_id: WORKER_USER_ID },
+    where: { user_id: WORKER_USER_ID_1 },
     update: {},
     create: {
-      user_id: WORKER_USER_ID,
+      user_id: WORKER_USER_ID_1,
       organization_id: BRANCH_ORG_ID,
-      name: '作業員三郎',
-      email: 'worker@example.com',
+      name: '作業員太郎',
+      email: 'worker1@example.com',
       password_hash: passwordHash,
       role: 'WORKER',
     },
   });
-  console.log('✓ User created: worker@example.com (WORKER)');
+  console.log('✓ User created: worker1@example.com (WORKER)');
+
+  await prisma.user.upsert({
+    where: { user_id: WORKER_USER_ID_2 },
+    update: {},
+    create: {
+      user_id: WORKER_USER_ID_2,
+      organization_id: BRANCH_ORG_ID,
+      name: '作業員次郎',
+      email: 'worker2@example.com',
+      password_hash: passwordHash,
+      role: 'WORKER',
+    },
+  });
+  console.log('✓ User created: worker2@example.com (WORKER)');
+
+  await prisma.user.upsert({
+    where: { user_id: WORKER_USER_ID_3 },
+    update: {},
+    create: {
+      user_id: WORKER_USER_ID_3,
+      organization_id: BRANCH_ORG_ID,
+      name: '作業員三郎',
+      email: 'worker3@example.com',
+      password_hash: passwordHash,
+      role: 'WORKER',
+    },
+  });
+  console.log('✓ User created: worker3@example.com (WORKER)');
+
+  // マイグレーションで作成されたデフォルトデータを削除
+  const DEFAULT_ID = '00000000-0000-0000-0000-000000000001';
+  await prisma.user.deleteMany({ where: { user_id: DEFAULT_ID } });
+  await prisma.organization.deleteMany({ where: { organization_id: DEFAULT_ID } });
+  console.log('✓ Removed migration default organization/user');
 
   // Update existing issues' reported_by to use the supervisor user
   await prisma.issue.updateMany({
