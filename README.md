@@ -34,7 +34,7 @@ npm run dev
 | WORKER | `worker3@example.com` | `password123` | 同上 |
 
 ## 4. 全体アーキテクチャ（§8.1）
-- 参照図: `doc/architecture.mmd`
+- 参照図: `docs/architecture.mmd`
 - レイヤ責務:
   - Presentation: Next.js UI / Route Handlers、HTTP入出力
   - Application: Command/Query のユースケース調停、DTO変換
@@ -66,7 +66,7 @@ npm run dev
   - `dbId`（部材指摘）
   - `worldPosition(x,y,z)`（空間指摘）
 - ビジネスルールは Domain 層へ集中
-- 参照図: `doc/er-diagram.mmd`
+- 参照図: `docs/er-diagram.mmd`
 - Domain 層は外部依存ゼロのため、Prisma・MinIO・NextAuth なしで純粋なユニットテストが可能。`src/domain/models/issue.test.ts` に状態遷移ルール（31テスト）を実装済み。Application 層の統合テスト（`src/application/commands/issue-commands.test.ts`）も含め計5ファイル・約850行のテストコードが存在する。
 
 ## 6. 読み取りと書き込みの整理（§8.3）
@@ -112,7 +112,7 @@ npm run dev
 
 ## 10. 設計判断（ADR）
 
-全14件の設計判断を記録する。詳細は `doc/phase0_plan.md` セクション 0.13 を参照。
+全14件の設計判断を記録する。詳細は `docs/phase0_plan.md` セクション 0.13 を参照。
 
 - **判断1: Next.js 単体構成**:
   - 16h 制約のため Next.js 単体を採用。設計上のレイヤー分離はディレクトリ構成で担保し、README に「本番では .NET バックエンドに分離」と明記する方針。
@@ -150,7 +150,7 @@ npm run dev
 
 ## 11. 設計仕様書
 
-本プロジェクトの詳細設計仕様は `doc/phase0_plan.md` に記述されている。実装に先立ってすべての要件・ドメインモデル・ADRを言語化したものであり、以下の主要な拡張設計が含まれる。
+本プロジェクトの詳細設計仕様は `docs/phase0_plan.md` に記述されている。実装に先立ってすべての要件・ドメインモデル・ADRを言語化したものであり、以下の主要な拡張設計が含まれる。
 
 - **Organization と User のドメインモデル**: Organization（Headquarters / Branch の1階層構造）と User（Admin / Supervisor / Worker の3ロール）を導入。本部が支部を管理し、支部がプロジェクト・建造物・ユーザーを管理する構造を定義している。
 - **5段階ステータス**: Issue の状態を PointOut / Open / InProgress / Done / Confirmed の5段階で管理する。最低要件の3段階（Open / InProgress / Done）からの拡張であり、「担当者未定」（PointOut）と「監督承認済み」（Confirmed）を明示的に区別するための判断（ADR 判断6）。この5段階ステータスは現在の実装にも反映済みで、`src/domain/models/issue.ts` の `IssueStatus` enum に実装されている。
@@ -160,14 +160,14 @@ npm run dev
 - **画面遷移・UI仕様**: ログイン、管理ダッシュボード、プロジェクト一覧、フロア一覧、3Dビュー（双方向ハイライト連動）、指摘詳細（StatusChangeLog タブ含む）の6画面構成とその詳細仕様。
 - **実装フェーズ計画**: Phase 0（設計）から Phase 9（ドキュメント整備）まで全10フェーズの実装計画と工数見積もり。
 
-なお、CLAUDE.md に記載の基本仕様との相違点として、CLAUDE.md では状態遷移を Open / InProgress / Done の3段階と記述しているが、`doc/phase0_plan.md` の拡張設計（ADR 判断6）に基づき、実装では PointOut / Open / InProgress / Done / Confirmed の5段階として実装されている。
+なお、CLAUDE.md に記載の基本仕様との相違点として、CLAUDE.md では状態遷移を Open / InProgress / Done の3段階と記述しているが、`docs/phase0_plan.md` の拡張設計（ADR 判断6）に基づき、実装では PointOut / Open / InProgress / Done / Confirmed の5段階として実装されている。
 
 ## 12. ディレクトリ構成
 ```text
 .
 |- .claude/
 |  |- agents/            # レイヤー別 AI エージェント定義
-|- doc/
+|- docs/
 |  |- architecture.mmd
 |  |- er-diagram.mmd
 |  |- phase0_plan.md     # 詳細設計仕様書（セクション10参照）
@@ -186,7 +186,7 @@ npm run dev
 ```
 
 ## 13. API仕様
-詳細は `doc/api-design.md` を参照。
+詳細は `docs/api-design.md` を参照。
 
 ### Buildings
 | Method | Path |
@@ -285,7 +285,7 @@ npm run dev
 | コマンド | 概要 |
 |---------|------|
 | `/commit-push` | 未コミット変更を論理グループに分割し、Conventional Commits 形式でコミット＆プッシュ |
-| `/plan-phase N` | `doc/phase0_plan.md` の対象フェーズを読み、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
+| `/plan-phase N` | `docs/phase0_plan.md` の対象フェーズを読み、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
 | `/impl-plan [scope]` | 仕様と現在の実装を比較してギャップを分析し、実装計画書を生成して project-manager への投げ込みプロンプトを出力 |
 | `/team-dispatch [plan-file]` | 作業プランをエージェント別に分割し、Wave ごとの並行実行プランファイルと project-manager へのプロンプトを出力 |
 | `/gen-test-spec [scope]` | 設計仕様と実装コードから Truth Matrix を生成し、テスト仕様書（`docs/test-spec.md`）を自動生成・検証する |
@@ -296,7 +296,7 @@ npm run dev
 
 ### 開発フロー
 
-全体の仕様・ドメインモデル・ADR は `doc/phase0_plan.md` に集約する。実装は以下の2パターンで進める。
+全体の仕様・ドメインモデル・ADR は `docs/phase0_plan.md` に集約する。実装は以下の2パターンで進める。
 
 #### パターン A: ウォーターフォール（フェーズ順実装）
 
@@ -367,7 +367,7 @@ PM（メインセッション）はコードを直接書かず、以下を担当
 - 統合テスト（ビルド通過・API 疎通・UI 動作確認）
 - AI の出力に対する人間判断での上書き
 
-実際の設計判断の例として、ADR 判断5（Organization・User の導入）では、Arent 担当者への確認が取れなかった状況で PM が「現場の実運用に必要」と判断して拡張を進めた。ADR 判断6（5段階ステータスの導入）も同様に、AI エージェントが生成した3段階の初期モデルに対して PM が「PointOut と Confirmed の欠落は実運用上の欠陥」と判断し、5段階への拡張を指示したものである。これらの判断は `doc/phase0_plan.md` のセクション 0.13 に記録されている。
+実際の設計判断の例として、ADR 判断5（Organization・User の導入）では、Arent 担当者への確認が取れなかった状況で PM が「現場の実運用に必要」と判断して拡張を進めた。ADR 判断6（5段階ステータスの導入）も同様に、AI エージェントが生成した3段階の初期モデルに対して PM が「PointOut と Confirmed の欠落は実運用上の欠陥」と判断し、5段階への拡張を指示したものである。これらの判断は `docs/phase0_plan.md` のセクション 0.13 に記録されている。
 
 ## 15. 振り返り: スコープと時間配分
 
